@@ -1,14 +1,16 @@
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.mixins import TenantScopedQuerysetMixin
-from apps.common.permissions import IsResourceOwnerOrTenantAdmin, IsTenantMember
-from apps.tasks.models import ActivityEvent, Comment, Notification, Task
+from apps.common.permissions import IsResourceOwnerOrTenantAdmin, IsTenantAdminOrOwner, IsTenantMember
+from apps.tasks.models import ActivityEvent, Comment, Notification, Task, TaskActivity
 from apps.tasks.serializers import ActivitySerializer, CommentSerializer, NotificationSerializer, TaskSerializer
+from apps.tasks.services import TaskService
 
 
 class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
@@ -16,10 +18,23 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
     serializer_class = TaskSerializer
     permission_classes = [permissions.IsAuthenticated, IsTenantMember]
 
+    @staticmethod
+    def _is_admin_or_owner(request):
+        membership = getattr(request, "membership", None)
+        return bool(membership and membership.role in {"admin", "owner"})
+
     def get_permissions(self):
+        if self.action in {"create"}:
+            return [permissions.IsAuthenticated(), IsTenantMember(), IsTenantAdminOrOwner()]
         if self.action in {"update", "partial_update", "destroy", "move"}:
             return [permissions.IsAuthenticated(), IsTenantMember(), IsResourceOwnerOrTenantAdmin()]
         return [permissions.IsAuthenticated(), IsTenantMember()]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self._is_admin_or_owner(self.request):
+            return queryset
+        return queryset.filter(assignee=self.request.user)
 
     def filter_queryset(self, queryset):
         queryset = super().filter_queryset(queryset)
@@ -55,7 +70,24 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        serializer.save(tenant=self.request.tenant, created_by=self.request.user)
+        TaskService.create_task(request=self.request, serializer=serializer, actor=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        result = TaskService.update_task(
+            request=request,
+            task=instance,
+            validated_data=serializer.validated_data,
+            actor=request.user,
+        )
+        return Response(self.get_serializer(result.task).data)
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return self.update(request, *args, **kwargs)
 
     @action(detail=True, methods=["patch"])
     def move(self, request, pk=None):
@@ -119,18 +151,41 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=["get"], url_path="activity")
     def activity(self, request, pk=None):
         task = self.get_object()
-        rows = task.activity.select_related("actor").all()
+        rows = TaskActivity.objects.filter(task=task, tenant=request.tenant).select_related("actor")
         page = self.paginate_queryset(rows)
         if page is not None:
-            return self.get_paginated_response(ActivitySerializer(page, many=True).data)
-        return Response(ActivitySerializer(rows, many=True).data)
+            payload = [
+                {
+                    "id": row.id,
+                    "event_type": row.event_type,
+                    "actor": {"id": row.actor_id, "display_name": row.actor.display_name, "avatar_url": row.actor.avatar_url},
+                    "old_values": row.old_values,
+                    "new_values": row.new_values,
+                    "created_at": row.created_at,
+                }
+                for row in page
+            ]
+            return self.get_paginated_response(payload)
+        return Response(
+            [
+                {
+                    "id": row.id,
+                    "event_type": row.event_type,
+                    "actor": {"id": row.actor_id, "display_name": row.actor.display_name, "avatar_url": row.actor.avatar_url},
+                    "old_values": row.old_values,
+                    "new_values": row.new_values,
+                    "created_at": row.created_at,
+                }
+                for row in rows
+            ]
+        )
 
 
 class NotificationListAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsTenantMember]
 
     def get(self, request):
-        queryset = Notification.objects.filter(recipient=request.user).select_related("actor", "task", "task__tenant")
+        queryset = Notification.objects.filter(recipient=request.user, tenant=request.tenant).select_related("actor", "task", "task__tenant")
         is_read = request.query_params.get("is_read")
         if is_read in {"true", "false"}:
             queryset = queryset.filter(is_read=(is_read == "true"))
@@ -147,15 +202,36 @@ class NotificationListAPIView(APIView):
 
 
 class NotificationMarkAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsTenantMember]
 
     def post(self, request, mode):
-        queryset = Notification.objects.filter(recipient=request.user)
+        queryset = Notification.objects.filter(recipient=request.user, tenant=request.tenant)
         if request.data.get("all") is True:
             target = queryset
         else:
             ids = request.data.get("ids", [])
             target = queryset.filter(id__in=ids)
 
-        updated = target.update(is_read=(mode == "read"))
+        if mode == "read":
+            updated = target.update(is_read=True, read_at=timezone.now())
+        else:
+            updated = target.update(is_read=False, read_at=None)
         return Response({"updated": updated})
+
+
+class NotificationDetailAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsTenantMember]
+
+    def patch(self, request, notification_id):
+        read = bool(request.data.get("read", True))
+        row = Notification.objects.filter(id=notification_id, recipient=request.user, tenant=request.tenant).first()
+        if not row:
+            return Response({"error": "not_found"}, status=status.HTTP_404_NOT_FOUND)
+        if read:
+            row.is_read = True
+            row.read_at = timezone.now()
+        else:
+            row.is_read = False
+            row.read_at = None
+        row.save(update_fields=["is_read", "read_at"])
+        return Response(NotificationSerializer(row).data)

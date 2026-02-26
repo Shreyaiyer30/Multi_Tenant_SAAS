@@ -1,6 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 
+from apps.projects.models import ProjectMember
 from apps.tasks.models import ActivityEvent, Comment, Notification, Task
 from apps.tenants.models import Membership
 
@@ -20,6 +21,7 @@ class TaskSerializer(serializers.ModelSerializer):
             "due_date",
             "created_by",
             "assignee",
+            "progress_percent",
             "position",
             "is_overdue",
             "created_at",
@@ -30,15 +32,21 @@ class TaskSerializer(serializers.ModelSerializer):
     def validate_project(self, value):
         tenant = self.context["request"].tenant
         if value.tenant_id != tenant.id:
-            raise serializers.ValidationError("invalid_project")
+            raise serializers.ValidationError("Project must belong to the selected workspace.")
         return value
 
     def validate_assignee(self, value):
         if value is None:
             return value
-        tenant = self.context["request"].tenant
+        request = self.context["request"]
+        tenant = request.tenant
         if not Membership.objects.filter(tenant=tenant, user=value).exists():
-            raise serializers.ValidationError("invalid_assignee")
+            raise serializers.ValidationError("Assignee must be a member of the selected workspace.")
+
+        project_id = self.initial_data.get("project") or getattr(getattr(self, "instance", None), "project_id", None)
+        if project_id:
+            if not ProjectMember.objects.filter(project_id=project_id, tenant=tenant, user=value).exists():
+                raise serializers.ValidationError("Assignee must be a member of this project.")
         return value
 
     def create(self, validated_data):
@@ -87,7 +95,7 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Notification
-        fields = ("id", "actor", "event_type", "body", "task", "is_read", "created_at")
+        fields = ("id", "actor", "event_type", "type", "body", "payload", "task", "is_read", "read_at", "created_at")
 
     def get_actor(self, obj):
         if not obj.actor:

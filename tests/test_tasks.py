@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.projects.models import Project
+from apps.projects.models import Project, ProjectMember
 from apps.tasks.models import Comment, Task
 from apps.tenants.models import Membership, Tenant
 
@@ -19,6 +19,8 @@ class TaskModuleTests(APITestCase):
         Membership.objects.create(tenant=self.tenant, user=self.owner, role=Membership.Role.OWNER)
         Membership.objects.create(tenant=self.tenant, user=self.member, role=Membership.Role.MEMBER)
         self.project = Project.objects.create(tenant=self.tenant, name="P1", description="", color="#6366F1", created_by=self.owner)
+        ProjectMember.objects.create(tenant=self.tenant, project=self.project, user=self.owner, role=ProjectMember.Role.LEAD)
+        ProjectMember.objects.create(tenant=self.tenant, project=self.project, user=self.member, role=ProjectMember.Role.CONTRIBUTOR)
         token = RefreshToken.for_user(self.owner)
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
 

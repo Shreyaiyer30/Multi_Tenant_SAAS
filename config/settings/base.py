@@ -4,6 +4,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from corsheaders.defaults import default_headers
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -35,7 +36,6 @@ INSTALLED_APPS = [
     "apps.tenants",
     "apps.projects",
     "apps.tasks",
-    "apps.billing",
     "apps.reporting",
 ]
 
@@ -136,6 +136,4 @@ CORS_ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 
-STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
-STRIPE_PRO_PRICE_ID = os.getenv("STRIPE_PRO_PRICE_ID", "")
+CORS_ALLOW_HEADERS = [*default_headers, "x-tenant"]

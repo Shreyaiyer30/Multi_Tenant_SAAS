@@ -1,4 +1,7 @@
+import logging
+
 from django.db.models import F
+from django.conf import settings
 from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -16,6 +19,8 @@ from apps.accounts.serializers import (
     UserSerializer,
 )
 from apps.tenants.models import Membership
+
+logger = logging.getLogger(__name__)
 
 
 class RegisterAPIView(APIView):
@@ -41,7 +46,29 @@ class RegisterAPIView(APIView):
     )
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if settings.DEBUG:
+            logger.debug(
+                "register_request",
+                extra={
+                    "content_type": request.content_type,
+                    "data": request.data,
+                },
+            )
+
+        if not serializer.is_valid():
+            if settings.DEBUG:
+                logger.debug(
+                    "register_validation_failed",
+                    extra={
+                        "is_valid": False,
+                        "errors": serializer.errors,
+                    },
+                )
+            return Response(
+                {"error": "validation_error", "detail": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         result = serializer.save()
 
         user = result["user"]

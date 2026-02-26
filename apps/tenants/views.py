@@ -86,18 +86,24 @@ class MembershipDetailAPIView(APIView):
 class WorkspaceDashboardAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsTenantMember, IsTenantAdminOrOwner]
 
-    def get(self, request):
+    @staticmethod
+    def _build_payload(request):
         tenant = request.tenant
-        tasks = Task.objects.filter(tenant=tenant)
+        tasks = tenant.tasks_task_items.all()
+        projects = tenant.projects_project_items.all()
 
         overview = {
             "total_members": tenant.memberships.count(),
-            "total_projects": tenant.projects.count(),
+            "total_projects": projects.count(),
             "total_tasks": tasks.count(),
             "active_tasks": tasks.exclude(status=Task.Status.DONE).count(),
             "completed_tasks": tasks.filter(status=Task.Status.DONE).count(),
             "overdue_tasks": tasks.filter(due_date__lt=__import__("django.utils.timezone").utils.timezone.localdate()).exclude(status=Task.Status.DONE).count(),
         }
+        
+        total_tasks = overview["total_tasks"]
+        completed_tasks = overview["completed_tasks"]
+        overview["completion_rate"] = int((completed_tasks / total_tasks) * 100) if total_tasks else 0
 
         status_counts = tasks.values("status").annotate(total=Count("id"))
         priority_counts = tasks.values("priority").annotate(total=Count("id"))
@@ -114,13 +120,30 @@ class WorkspaceDashboardAPIView(APIView):
             for e in recent
         ]
 
-        return Response(
-            {
-                "overview": overview,
-                "tasks_by_status": {row["status"]: row["total"] for row in status_counts},
-                "tasks_by_priority": {row["priority"]: row["total"] for row in priority_counts},
-                "recent_activity": recent_payload,
-                "members_summary": [],
-                "projects_summary": [],
-            }
-        )
+        return {
+            "overview": overview,
+            "tasks_by_status": {row["status"]: row["total"] for row in status_counts},
+            "tasks_by_priority": {row["priority"]: row["total"] for row in priority_counts},
+            "recent_activity": recent_payload,
+            "members_summary": [],
+            "projects_summary": [],
+        }
+
+    def get(self, request):
+        return Response(self._build_payload(request))
+
+
+class WorkspaceDashboardSummaryAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsTenantMember, IsTenantAdminOrOwner]
+
+    def get(self, request):
+        payload = WorkspaceDashboardAPIView._build_payload(request)
+        return Response(payload["overview"])
+
+
+class WorkspaceDashboardChartsAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsTenantMember, IsTenantAdminOrOwner]
+
+    def get(self, request):
+        payload = WorkspaceDashboardAPIView._build_payload(request)
+        return Response({"tasks_by_status": payload["tasks_by_status"], "tasks_by_priority": payload["tasks_by_priority"]})

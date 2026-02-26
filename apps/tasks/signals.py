@@ -38,7 +38,15 @@ def track_task_changes(sender, instance, **kwargs):
     if old.priority != instance.priority:
         events.append((ActivityEvent.EventType.PRIORITY_CHANGED, {"from": old.priority, "to": instance.priority}))
     if old.assignee_id != instance.assignee_id:
-        events.append((ActivityEvent.EventType.ASSIGNEE_CHANGED, {"from": old.assignee_id, "to": instance.assignee_id}))
+        events.append(
+            (
+                ActivityEvent.EventType.ASSIGNEE_CHANGED,
+                {
+                    "from": str(old.assignee_id) if old.assignee_id else None,
+                    "to": str(instance.assignee_id) if instance.assignee_id else None,
+                },
+            )
+        )
     if old.due_date != instance.due_date:
         events.append((ActivityEvent.EventType.DUE_DATE_CHANGED, {"from": str(old.due_date) if old.due_date else None, "to": str(instance.due_date) if instance.due_date else None}))
 

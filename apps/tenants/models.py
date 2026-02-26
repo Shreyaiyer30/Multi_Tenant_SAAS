@@ -17,12 +17,6 @@ class Tenant(UUIDModel, TimeStampedModel):
     max_users = models.PositiveIntegerField(default=3)
     max_projects = models.PositiveIntegerField(default=5)
 
-    stripe_customer_id = models.CharField(max_length=255, blank=True, null=True)
-    stripe_subscription_id = models.CharField(max_length=255, blank=True, null=True)
-    subscription_status = models.CharField(max_length=64, blank=True, null=True)
-    current_period_end = models.DateTimeField(blank=True, null=True)
-    cancel_at_period_end = models.BooleanField(default=False)
-
     class Meta:
         ordering = ["name"]
 
@@ -54,3 +48,23 @@ class Membership(UUIDModel):
 
     def __str__(self):
         return f"{self.user_id}:{self.tenant_id}:{self.role}"
+
+
+class Department(UUIDModel, TimeStampedModel):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="departments")
+    name = models.CharField(max_length=120)
+    code = models.CharField(max_length=32, blank=True)
+
+    class Meta:
+        unique_together = ("tenant", "name")
+        ordering = ["name"]
+
+
+class DepartmentMembership(UUIDModel, TimeStampedModel):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="department_memberships")
+    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name="memberships")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="department_memberships")
+
+    class Meta:
+        unique_together = ("department", "user")
+        indexes = [models.Index(fields=["tenant", "department"]), models.Index(fields=["tenant", "user"])]

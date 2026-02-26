@@ -26,6 +26,7 @@ class Task(UUIDModel, TimeStampedModel, TenantScopedModel):
     due_date = models.DateField(blank=True, null=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="tasks_created")
     assignee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="tasks_assigned")
+    progress_percent = models.PositiveIntegerField(default=0)
     position = models.PositiveIntegerField(default=0)
 
     class Meta:
@@ -35,6 +36,13 @@ class Task(UUIDModel, TimeStampedModel, TenantScopedModel):
             models.Index(fields=["tenant", "created_at"]),
             models.Index(fields=["tenant", "status"]),
             models.Index(fields=["tenant", "priority"]),
+            models.Index(fields=["tenant", "assignee", "status"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(progress_percent__gte=0) & models.Q(progress_percent__lte=100),
+                name="tasks_task_progress_percent_0_100",
+            ),
         ]
 
     @property
@@ -79,13 +87,32 @@ class ActivityEvent(UUIDModel):
 
 
 class Notification(UUIDModel):
+    tenant = models.ForeignKey("tenants.Tenant", on_delete=models.CASCADE, related_name="notifications", null=True, blank=True)
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications")
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="triggered_notifications")
+    type = models.CharField(max_length=64, default="generic")
     event_type = models.CharField(max_length=64)
     task = models.ForeignKey(Task, on_delete=models.CASCADE, null=True, blank=True, related_name="notifications")
     body = models.CharField(max_length=500)
+    payload = models.JSONField(default=dict, blank=True)
+    read_at = models.DateTimeField(blank=True, null=True)
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [models.Index(fields=["tenant", "recipient", "read_at", "created_at"])]
+
+
+class TaskActivity(UUIDModel):
+    tenant = models.ForeignKey("tenants.Tenant", on_delete=models.CASCADE, related_name="task_activities")
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="activity_log")
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="task_activities")
+    event_type = models.CharField(max_length=64)
+    old_values = models.JSONField(default=dict, blank=True)
+    new_values = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["tenant", "task", "created_at"])]
