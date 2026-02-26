@@ -83,7 +83,7 @@ export default function Tasks() {
           </TBody>
         </Table>
       </CardContent>
-      <TaskCreateModal open={openCreate} onOpenChange={setOpenCreate} onCreated={loadTasks} projects={projects} members={members} />
+      <TaskCreateModal open={openCreate} onOpenChange={setOpenCreate} onCreated={loadTasks} projects={projects} />
       <TaskModal task={selectedTask} open={Boolean(selectedTask)} onOpenChange={(open) => !open && setSelectedTask(null)} onUpdated={loadTasks} />
     </Card>
   );

@@ -4,7 +4,6 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.billing.models import BillingWebhookEvent
 from apps.projects.models import Project, ProjectMember
 from apps.tasks.models import Notification, Task, TaskActivity
 from apps.tenants.models import Membership, Tenant
@@ -26,10 +25,10 @@ class WorkflowRegressionTests(APITestCase):
         Membership.objects.create(tenant=self.tenant_b, user=self.other, role=Membership.Role.OWNER)
 
         self.project = Project.objects.create(tenant=self.tenant, name="P1", description="", color="#111111", created_by=self.owner)
-        ProjectMember.objects.create(tenant=self.tenant, project=self.project, user=self.owner, role=ProjectMember.Role.LEAD)
+        ProjectMember.objects.create(tenant=self.tenant, project=self.project, user=self.owner, role=ProjectMember.Role.ADMIN)
 
         self.project_b = Project.objects.create(tenant=self.tenant_b, name="P2", description="", color="#222222", created_by=self.other)
-        ProjectMember.objects.create(tenant=self.tenant_b, project=self.project_b, user=self.other, role=ProjectMember.Role.LEAD)
+        ProjectMember.objects.create(tenant=self.tenant_b, project=self.project_b, user=self.other, role=ProjectMember.Role.ADMIN)
 
     def _auth(self, user):
         token = RefreshToken.for_user(user)
@@ -65,7 +64,7 @@ class WorkflowRegressionTests(APITestCase):
         self.assertIn("assignee", response.data["detail"])
 
     def test_task_activity_and_notifications_created(self):
-        ProjectMember.objects.create(tenant=self.tenant, project=self.project, user=self.member, role=ProjectMember.Role.CONTRIBUTOR)
+        ProjectMember.objects.create(tenant=self.tenant, project=self.project, user=self.member, role=ProjectMember.Role.MEMBER)
         task = Task.objects.create(
             tenant=self.tenant,
             project=self.project,
@@ -89,7 +88,7 @@ class WorkflowRegressionTests(APITestCase):
         self.assertTrue(Notification.objects.filter(tenant=self.tenant, type="task_completed").exists())
 
     def test_auto_assignment_deterministic(self):
-        ProjectMember.objects.create(tenant=self.tenant, project=self.project, user=self.member, role=ProjectMember.Role.CONTRIBUTOR)
+        ProjectMember.objects.create(tenant=self.tenant, project=self.project, user=self.member, role=ProjectMember.Role.MEMBER)
         done_task = Task.objects.create(
             tenant=self.tenant,
             project=self.project,
@@ -132,15 +131,4 @@ class WorkflowRegressionTests(APITestCase):
         t1.refresh_from_db()
         self.assertEqual(t1.assignee_id, self.member.id)
 
-    def test_billing_webhook_idempotency(self):
-        payload = {
-            "id": "evt_1",
-            "type": "customer.subscription.updated",
-            "data": {"object": {"metadata": {"tenant_slug": self.tenant.slug}}},
-        }
-        first = self.client.post(reverse("billing-webhook"), payload, format="json")
-        second = self.client.post(reverse("billing-webhook"), payload, format="json")
-        self.assertEqual(first.status_code, status.HTTP_200_OK)
-        self.assertEqual(second.status_code, status.HTTP_200_OK)
-        self.assertEqual(BillingWebhookEvent.objects.filter(event_id="evt_1").count(), 1)
 

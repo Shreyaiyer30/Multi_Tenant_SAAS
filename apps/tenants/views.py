@@ -79,6 +79,9 @@ class MembershipDetailAPIView(APIView):
                     {"error": "cannot_remove_last_owner"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+        # Unassign tasks across all projects in this tenant
+        Task.objects.filter(tenant=request.tenant, assignee=membership.user).update(assignee=None, updated_at=__import__("django.utils.timezone").utils.timezone.now())
+        
         membership.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

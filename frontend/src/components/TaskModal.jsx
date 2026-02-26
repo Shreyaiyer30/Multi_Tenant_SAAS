@@ -113,7 +113,10 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated }) {
                 ))}
               </select>
             </div>
-            <Input type="number" min="0" max="100" value={form.progress_percent ?? 0} onChange={(e) => setForm((p) => ({ ...p, progress_percent: Number(e.target.value) }))} placeholder="Progress %" />
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Progress (%) - Managed by status</label>
+              <Input type="number" value={form.progress_percent ?? 0} disabled bg-muted />
+            </div>
             <Button onClick={saveTask}>Save Changes</Button>
           </TabsContent>
 

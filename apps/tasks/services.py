@@ -194,7 +194,7 @@ class TaskService:
             raise ValidationError({"project": ["Project does not belong to this workspace."]})
         
         assignee = serializer.validated_data.get("assignee")
-        cls._validate_assignee_in_project(request=request, task=Task(project=project), assignee=assignee)
+        TaskService._validate_assignee_in_project(request=request, task=Task(project=project), assignee=assignee)
 
         serializer.save(tenant=request.tenant, created_by=actor)
         task = serializer.instance

@@ -80,7 +80,7 @@ class ProjectViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
             return Response({"error": "error", "detail": {"detail": "Only admin or owner can manage project members."}}, status=status.HTTP_403_FORBIDDEN)
 
         user_id = request.data.get("user_id")
-        role = request.data.get("role", ProjectMember.Role.CONTRIBUTOR)
+        role = request.data.get("role", ProjectMember.Role.MEMBER)
         if not user_id:
             return Response({"error": "validation_error", "detail": {"user_id": ["This field is required."]}}, status=status.HTTP_400_BAD_REQUEST)
 
