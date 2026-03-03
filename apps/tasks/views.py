@@ -98,12 +98,14 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         with transaction.atomic():
             if status_to != task.status:
                 task.status = status_to
+            # Keep progress consistent with status on board moves.
+            task.progress_percent = 100 if task.status == Task.Status.DONE else 0
             if position is None:
                 max_pos = Task.objects.filter(tenant=request.tenant, project=task.project, status=task.status).exclude(id=task.id).order_by("-position").values_list("position", flat=True).first()
                 task.position = 0 if max_pos is None else max_pos + 1
             else:
                 task.position = max(int(position), 0)
-            task.save(update_fields=["status", "position", "updated_at"])
+            task.save(update_fields=["status", "progress_percent", "position", "updated_at"])
 
         return Response(TaskSerializer(task, context={"request": request}).data)
 
@@ -185,16 +187,21 @@ class NotificationListAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsTenantMember]
 
     def get(self, request):
-        queryset = Notification.objects.filter(recipient=request.user, tenant=request.tenant).select_related("actor", "task", "task__tenant")
+        base_queryset = Notification.objects.filter(recipient=request.user, tenant=request.tenant).select_related("actor", "task", "task__tenant")
+        queryset = base_queryset
         is_read = request.query_params.get("is_read")
         if is_read in {"true", "false"}:
             queryset = queryset.filter(is_read=(is_read == "true"))
 
-        page_size = min(int(request.query_params.get("limit", 20)), 50)
+        try:
+            page_size = int(request.query_params.get("limit", 20))
+        except (TypeError, ValueError):
+            page_size = 20
+        page_size = max(1, min(page_size, 50))
         rows = queryset[:page_size]
         return Response(
             {
-                "unread_count": Notification.objects.filter(recipient=request.user, is_read=False).count(),
+                "unread_count": base_queryset.filter(is_read=False).count(),
                 "count": queryset.count(),
                 "results": NotificationSerializer(rows, many=True).data,
             }

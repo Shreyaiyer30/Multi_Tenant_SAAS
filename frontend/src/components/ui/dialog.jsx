@@ -7,11 +7,15 @@ export const Dialog = RadixDialog.Root;
 export const DialogTrigger = RadixDialog.Trigger;
 export const DialogClose = RadixDialog.Close;
 
-export function DialogOverlay({ className, ...props }) {
+export const DialogOverlay = React.forwardRef(function DialogOverlay(
+  { className, ...props },
+  ref
+) {
   return (
     <RadixDialog.Overlay
+      ref={ref}
       className={cn(
-        "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm",
+        "fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
         className
@@ -19,16 +23,21 @@ export function DialogOverlay({ className, ...props }) {
       {...props}
     />
   );
-}
+});
+DialogOverlay.displayName = RadixDialog.Overlay.displayName;
 
-export function DialogContent({ className, children, ...props }) {
+export const DialogContent = React.forwardRef(function DialogContent(
+  { className, children, ...props },
+  ref
+) {
   return (
     <RadixDialog.Portal>
       <DialogOverlay />
       <RadixDialog.Content
+        ref={ref}
         className={cn(
           "fixed left-1/2 top-1/2 z-50 w-[95vw] max-w-lg -translate-x-1/2 -translate-y-1/2",
-          "rounded-xl border bg-card p-6 shadow-2xl",
+          "rounded-2xl border border-border/70 bg-card/95 p-6 shadow-[0_24px_60px_rgba(2,6,23,0.6)] backdrop-blur-xl",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
           "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
@@ -43,31 +52,41 @@ export function DialogContent({ className, children, ...props }) {
       </RadixDialog.Content>
     </RadixDialog.Portal>
   );
-}
+});
+DialogContent.displayName = RadixDialog.Content.displayName;
 
 export function DialogHeader({ className, ...props }) {
-  return <div className={cn("mb-4 flex flex-col gap-2", className)} {...props} />;
+  return <div className={cn("mb-5 flex flex-col gap-2", className)} {...props} />;
 }
 
-export function DialogTitle({ className, ...props }) {
+export const DialogTitle = React.forwardRef(function DialogTitle(
+  { className, ...props },
+  ref
+) {
   return (
     <RadixDialog.Title
-      className={cn("text-lg font-semibold leading-none tracking-tight", className)}
+      ref={ref}
+      className={cn("text-xl font-semibold leading-none tracking-tight", className)}
       {...props}
     />
   );
-}
+});
+DialogTitle.displayName = RadixDialog.Title.displayName;
 
-export function DialogDescription({ className, ...props }) {
+export const DialogDescription = React.forwardRef(function DialogDescription(
+  { className, ...props },
+  ref
+) {
   return (
     <RadixDialog.Description
-      className={cn("text-sm text-muted-foreground", className)}
+      ref={ref}
+      className={cn("text-sm text-muted-foreground/95", className)}
       {...props}
     />
   );
-}
+});
+DialogDescription.displayName = RadixDialog.Description.displayName;
 
-/** ✅ Added: DialogFooter (this fixes your import error) */
 export function DialogFooter({ className, ...props }) {
   return (
     <div

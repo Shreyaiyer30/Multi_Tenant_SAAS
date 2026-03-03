@@ -68,3 +68,38 @@ class DepartmentMembership(UUIDModel, TimeStampedModel):
     class Meta:
         unique_together = ("department", "user")
         indexes = [models.Index(fields=["tenant", "department"]), models.Index(fields=["tenant", "user"])]
+
+
+class SubscriptionPlan(TimeStampedModel):
+    class Code(models.TextChoices):
+        FREE = "free", "Free"
+        PRO = "pro", "Pro"
+        ENTERPRISE = "enterprise", "Enterprise"
+
+    name = models.CharField(max_length=100, unique=True)
+    code = models.CharField(max_length=20, choices=Code.choices, default=Code.PRO)
+    price = models.PositiveIntegerField()  # in paise
+    max_projects = models.PositiveIntegerField()
+    max_users = models.PositiveIntegerField()
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["price", "name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.price})"
+
+
+class WorkspaceSubscription(TimeStampedModel):
+    workspace = models.OneToOneField(Tenant, on_delete=models.CASCADE, related_name="subscription")
+    plan = models.ForeignKey(SubscriptionPlan, on_delete=models.SET_NULL, null=True, blank=True, related_name="workspace_subscriptions")
+    razorpay_order_id = models.CharField(max_length=255, blank=True)
+    razorpay_payment_id = models.CharField(max_length=255, blank=True)
+    is_active = models.BooleanField(default=False)
+    start_date = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"{self.workspace.slug}::{self.plan.name if self.plan else 'none'}"

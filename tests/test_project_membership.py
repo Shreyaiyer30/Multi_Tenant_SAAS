@@ -12,9 +12,9 @@ User = get_user_model()
 
 class ProjectMembershipTests(APITestCase):
     def setUp(self):
-        self.user_admin = User.objects.create_user(email="admin@example.com", password="Pass1", display_name="Admin")
-        self.user_member = User.objects.create_user(email="member@example.com", password="Pass1", display_name="Member")
-        self.user_other = User.objects.create_user(email="other@example.com", password="Pass1", display_name="Other")
+        self.user_admin = User.objects.create_user(email="admin@example.com", password="Pass1")
+        self.user_member = User.objects.create_user(email="member@example.com", password="Pass1")
+        self.user_other = User.objects.create_user(email="other@example.com", password="Pass1")
         
         self.tenant = Tenant.objects.create(name="Tenant", slug="tenant")
         Membership.objects.create(tenant=self.tenant, user=self.user_admin, role=Membership.Role.ADMIN)

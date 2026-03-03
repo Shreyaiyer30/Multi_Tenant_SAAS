@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useTenant } from "@/context/TenantContext";
 import { useAuth } from "@/context/AuthContext";
 
-export default function WorkspaceSwitcher() {
+export default function WorkspaceSwitcher({ compact = false }) {
   const { tenant, setTenant } = useTenant();
   const { user } = useAuth();
   const [workspaces, setWorkspaces] = useState(() => {
@@ -29,17 +29,18 @@ export default function WorkspaceSwitcher() {
 
   return (
     <div className="space-y-2">
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">Workspace</p>
-      <div className="rounded-md border bg-card p-1">
+      {!compact ? <p className="px-2 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Workspace</p> : null}
+      <div className="rounded-2xl border border-border/70 bg-card/65 p-1.5">
         {workspaces.map((ws) => (
           <Button
             key={ws.slug}
             variant="ghost"
-            className="w-full justify-between"
+            className="h-10 w-full justify-between rounded-xl"
             onClick={() => setTenant(ws.slug)}
+            title={ws.name || ws.slug}
           >
-            <span className="truncate">{ws.name || ws.slug}</span>
-            {tenant === ws.slug ? <Check className="h-4 w-4" /> : <ChevronsUpDown className="h-4 w-4" />}
+            {!compact ? <span className="truncate">{ws.name || ws.slug}</span> : <span className="truncate">{(ws.name || ws.slug).slice(0, 2).toUpperCase()}</span>}
+            {tenant === ws.slug ? <Check className="h-4 w-4" /> : !compact ? <ChevronsUpDown className="h-4 w-4" /> : null}
           </Button>
         ))}
       </div>

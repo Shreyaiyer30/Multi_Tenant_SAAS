@@ -51,7 +51,7 @@ class TaskAssignmentTests(APITestCase):
         response = self.client.post(url, data, format="json", HTTP_X_TENANT=self.tenant.slug)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         # Check for specific error code if provided in backend
-        self.assertIn("assignee", response.data)
+        self.assertIn("assignee", response.data.get("detail", {}))
         
     def test_update_assignee_to_non_project_member_fails(self):
         task = Task.objects.create(tenant=self.tenant, project=self.project, created_by=self.user_admin, title="Task")

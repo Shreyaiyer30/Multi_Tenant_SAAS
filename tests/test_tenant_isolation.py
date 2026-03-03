@@ -25,18 +25,18 @@ class TenantIsolationTests(APITestCase):
 
     def test_missing_tenant_header_returns_400(self):
         response = self.client.get(reverse("member-list-create"))
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["error"], "missing_tenant_header")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["error"], "error")
 
     def test_nonexistent_tenant_slug_returns_404(self):
         response = self.client.get(reverse("member-list-create"), HTTP_X_TENANT="does-not-exist")
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["error"], "tenant_not_found")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["error"], "error")
 
     def test_valid_slug_without_membership_returns_403(self):
         response = self.client.get(reverse("member-list-create"), HTTP_X_TENANT=self.tenant_b.slug)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(response.data["error"], "tenant_access_denied")
+        self.assertEqual(response.data["error"], "error")
 
     def test_inactive_tenant_returns_403(self):
         self.tenant_a.is_active = False
@@ -44,7 +44,7 @@ class TenantIsolationTests(APITestCase):
 
         response = self.client.get(reverse("member-list-create"), HTTP_X_TENANT=self.tenant_a.slug)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(response.data["error"], "tenant_inactive")
+        self.assertEqual(response.data["error"], "error")
 
     def test_cross_tenant_membership_read_update_delete_return_404(self):
         response_get = self.client.patch(

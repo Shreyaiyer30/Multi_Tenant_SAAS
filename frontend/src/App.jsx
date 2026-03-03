@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
@@ -14,12 +15,28 @@ import Reports from "@/pages/Reports";
 import { useAuth } from "@/context/AuthContext";
 
 function ProtectedLayout() {
+  const location = useLocation();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname]);
+
   return (
-    <div className="min-h-screen bg-background md:grid md:grid-cols-[240px_1fr]">
-      <Sidebar />
-      <main>
-        <Topbar />
-        <div className="p-4 md:p-6">
+    <div className="min-h-screen bg-background lg:grid" style={{ gridTemplateColumns: sidebarCollapsed ? "72px 1fr" : "260px 1fr" }}>
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
+        mobileOpen={mobileSidebarOpen}
+        onMobileOpenChange={setMobileSidebarOpen}
+      />
+      <main className="min-w-0 overflow-x-hidden">
+        <Topbar
+          collapsed={sidebarCollapsed}
+          onToggleMobileSidebar={() => setMobileSidebarOpen((value) => !value)}
+        />
+        <div className="page-enter mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 md:py-6 lg:px-8">
           <Outlet />
         </div>
       </main>

@@ -40,17 +40,17 @@ export default function Projects() {
   }, [tenant]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 min-w-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold">Projects</h1>
-        {canCreate ? <Button onClick={() => setOpen(true)}>Create Project</Button> : null}
+        {canCreate ? <Button className="h-11 w-full sm:w-auto" onClick={() => setOpen(true)}>Create Project</Button> : null}
       </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {projects.map((project) => (
-          <Card key={project.id} className="cursor-pointer">
+          <Card key={project.id} className="cursor-pointer min-w-0">
             <CardHeader className="space-y-2" onClick={() => navigate(`/projects/${project.id}/board`)}>
               <div className="flex items-center justify-between">
-                <CardTitle>{project.name}</CardTitle>
+                <CardTitle className="line-clamp-1 min-w-0">{project.name}</CardTitle>
                 <span className="rounded-full border px-2 py-0.5 text-xs">{project.status || "ongoing"}</span>
               </div>
               <div className="h-2 rounded-full bg-muted">
@@ -58,10 +58,11 @@ export default function Projects() {
               </div>
             </CardHeader>
             <CardContent className="space-y-2">
-              <p className="text-sm text-muted-foreground">{project.description || "No description"}</p>
+              <p className="line-clamp-2 text-sm text-muted-foreground">{project.description || "No description"}</p>
               <Button
                 variant="secondary"
                 size="sm"
+                className="h-11 w-full sm:w-auto"
                 onClick={() => {
                   setSelectedProject(project);
                   setMembersOpen(true);

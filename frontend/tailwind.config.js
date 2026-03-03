@@ -16,13 +16,21 @@ export default {
         foreground: "hsl(var(--foreground))",
         card: "hsl(var(--card))",
         "card-foreground": "hsl(var(--card-foreground))",
+        "card-elevated": "hsl(var(--card-elevated))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         primary: "hsl(var(--primary))",
+        "primary-hover": "hsl(var(--primary-hover))",
+        "primary-active": "hsl(var(--primary-active))",
         "primary-foreground": "hsl(var(--primary-foreground))",
         muted: "hsl(var(--muted))",
-        "muted-foreground": "hsl(var(--muted-foreground))"
+        "muted-foreground": "hsl(var(--muted-foreground))",
+        success: "hsl(var(--success))",
+        "success-foreground": "hsl(var(--success-foreground))",
+        danger: "hsl(var(--danger))",
+        "danger-foreground": "hsl(var(--danger-foreground))",
+        disabled: "hsl(var(--disabled))"
       }
     }
   },

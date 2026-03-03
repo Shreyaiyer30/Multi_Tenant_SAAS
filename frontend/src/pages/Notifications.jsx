@@ -13,6 +13,11 @@ export default function Notifications() {
   const navigate = useNavigate();
 
   const load = async () => {
+    if (!tenant) {
+      setItems([]);
+      return;
+    }
+
     setLoading(true);
     try {
       const { data } = await api.get("notifications/");

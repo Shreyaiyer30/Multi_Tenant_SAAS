@@ -6,6 +6,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+const progressByStatus = {
+  todo: 0,
+  in_progress: 0,
+  in_review: 0,
+  done: 100
+};
+
 export default function TaskModal({ task, open, onOpenChange, onUpdated }) {
   const [form, setForm] = useState(task || {});
   const [comments, setComments] = useState([]);
@@ -33,7 +40,12 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated }) {
 
   const saveTask = async () => {
     try {
-      await api.patch(`tasks/${task.id}/`, form);
+      const payload = {
+        ...form,
+        progress_percent: progressByStatus[form.status] ?? 0
+      };
+      const { data } = await api.patch(`tasks/${task.id}/`, payload);
+      setForm(data || payload);
       toast.success("Task updated");
       onUpdated?.();
     } catch {
@@ -89,7 +101,13 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated }) {
                 <select
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   value={form.status || "todo"}
-                  onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
+                      status: e.target.value,
+                      progress_percent: progressByStatus[e.target.value] ?? 0
+                    }))
+                  }
                 >
                   <option value="todo">Todo</option>
                   <option value="in_progress">In Progress</option>
@@ -115,7 +133,7 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated }) {
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Progress (%) - Managed by status</label>
-              <Input type="number" value={form.progress_percent ?? 0} disabled bg-muted />
+              <Input type="number" value={progressByStatus[form.status] ?? form.progress_percent ?? 0} disabled className="bg-muted" />
             </div>
             <Button onClick={saveTask}>Save Changes</Button>
           </TabsContent>

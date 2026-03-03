@@ -56,32 +56,48 @@ export default function Tasks() {
   }, [tenant]);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+    <Card className="min-w-0">
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle>Tasks</CardTitle>
-        {canCreate ? <Button onClick={() => setOpenCreate(true)}>Create Task</Button> : null}
+        {canCreate ? <Button className="h-11 w-full sm:w-auto" onClick={() => setOpenCreate(true)}>Create Task</Button> : null}
       </CardHeader>
       <CardContent>
-        <Table>
-          <THead>
-            <TR>
-              <TH>Title</TH>
-              <TH>Status</TH>
-              <TH>Priority</TH>
-              <TH>Assignee</TH>
-            </TR>
-          </THead>
-          <TBody>
-            {tasks.map((task) => (
-              <TR key={task.id} className="cursor-pointer" onClick={() => setSelectedTask(task)}>
-                <TD>{task.title}</TD>
-                <TD>{task.status}</TD>
-                <TD>{task.priority}</TD>
-                <TD>{assigneeNameById[task.assignee] || "Unassigned"}</TD>
+        <div className="sm:hidden space-y-2">
+          {tasks.map((task) => (
+            <button key={task.id} className="w-full rounded-xl border border-border/70 bg-card-elevated/45 p-3 text-left" onClick={() => setSelectedTask(task)}>
+              <p className="line-clamp-2 text-sm font-medium">{task.title}</p>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                <p>Status: <span className="text-foreground">{task.status}</span></p>
+                <p>Priority: <span className="text-foreground">{task.priority}</span></p>
+                <p className="col-span-2 truncate">Assignee: <span className="text-foreground">{assigneeNameById[task.assignee] || "Unassigned"}</span></p>
+              </div>
+            </button>
+          ))}
+          {!tasks.length ? <p className="text-sm text-muted-foreground">No tasks yet.</p> : null}
+        </div>
+
+        <div className="hidden sm:block overflow-x-auto">
+          <Table>
+            <THead>
+              <TR>
+                <TH>Title</TH>
+                <TH>Status</TH>
+                <TH>Priority</TH>
+                <TH>Assignee</TH>
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {tasks.map((task) => (
+                <TR key={task.id} className="cursor-pointer" onClick={() => setSelectedTask(task)}>
+                  <TD className="min-w-[220px]">{task.title}</TD>
+                  <TD>{task.status}</TD>
+                  <TD>{task.priority}</TD>
+                  <TD>{assigneeNameById[task.assignee] || "Unassigned"}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </div>
       </CardContent>
       <TaskCreateModal open={openCreate} onOpenChange={setOpenCreate} onCreated={loadTasks} projects={projects} />
       <TaskModal task={selectedTask} open={Boolean(selectedTask)} onOpenChange={(open) => !open && setSelectedTask(null)} onUpdated={loadTasks} />

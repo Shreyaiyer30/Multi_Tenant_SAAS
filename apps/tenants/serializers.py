@@ -4,7 +4,7 @@ from django.utils.text import slugify
 from rest_framework import serializers
 
 from apps.tasks.models import ActivityEvent, Task
-from apps.tenants.models import Membership, Tenant
+from apps.tenants.models import Membership, SubscriptionPlan, Tenant, WorkspaceSubscription
 
 User = get_user_model()
 
@@ -90,3 +90,27 @@ class WorkspaceDashboardSerializer(serializers.Serializer):
     recent_activity = serializers.ListField()
     members_summary = serializers.ListField()
     projects_summary = serializers.ListField()
+
+
+class SubscriptionPlanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubscriptionPlan
+        fields = ("id", "name", "code", "price", "max_projects", "max_users", "is_active")
+
+
+class WorkspaceSubscriptionSerializer(serializers.ModelSerializer):
+    plan = SubscriptionPlanSerializer(read_only=True)
+
+    class Meta:
+        model = WorkspaceSubscription
+        fields = (
+            "id",
+            "workspace",
+            "plan",
+            "razorpay_order_id",
+            "is_active",
+            "start_date",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields

@@ -35,7 +35,7 @@ export default function Reports() {
         <CardHeader><CardTitle>Reporting Overview</CardTitle></CardHeader>
         <CardContent>
           {error ? (
-            <p className="text-sm text-red-500">{error}</p>
+            <p className="text-sm text-danger-foreground">{error}</p>
           ) : (
             <p className="text-sm text-muted-foreground">
               Tasks created: {stats?.tasks_created ?? 0} · completed: {stats?.tasks_completed ?? 0} · overdue: {stats?.tasks_overdue ?? 0}
