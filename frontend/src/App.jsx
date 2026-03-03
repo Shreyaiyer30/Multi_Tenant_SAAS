@@ -12,6 +12,7 @@ import Tasks from "@/pages/Tasks";
 import Notifications from "@/pages/Notifications";
 import Members from "@/pages/Members";
 import Reports from "@/pages/Reports";
+import Billing from "@/pages/Billing";
 import { useAuth } from "@/context/AuthContext";
 
 function ProtectedLayout() {
@@ -77,6 +78,7 @@ export default function App() {
         <Route path="/tasks" element={<Tasks />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/members" element={<Members />} />
+        <Route path="/billing" element={<Billing />} />
         <Route path="/reports" element={<Reports />} />
       </Route>
     </Routes>

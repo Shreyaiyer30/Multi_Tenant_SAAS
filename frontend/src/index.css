@@ -69,11 +69,11 @@ body {
 @layer utilities {
   .surface-glass {
     background-color: hsl(var(--card) / 0.88);
-    @apply backdrop-blur-xl border border-border/65 shadow-[0_16px_42px_rgba(9, 12, 18, 0.42)];
+    @apply border border-border/65 backdrop-blur-xl shadow-[0_16px_42px_rgba(9,12,18,0.42)];
   }
 
   .elevate-hover {
-    @apply transition-all duration-150 ease-in-out hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(9, 12, 18, 0.45)];
+    @apply transition-all duration-150 ease-in-out hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(9,12,18,0.45)];
   }
 
   .page-enter {
