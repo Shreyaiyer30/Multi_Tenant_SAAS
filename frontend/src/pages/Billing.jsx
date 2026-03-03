@@ -114,12 +114,12 @@ export default function Billing() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Billing & Plans</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Manage workspace subscription and upgrade limits.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Manage tenant subscription and workspace-wide limits.</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Current Workspace Plan</CardTitle>
+          <CardTitle>Current Tenant Plan</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           {loading ? (
@@ -127,8 +127,8 @@ export default function Billing() {
           ) : (
             <>
               <p>Plan: <span className="font-medium capitalize">{workspaceInfo?.plan || "free"}</span></p>
-              <p>Max Projects: <span className="font-medium">{workspaceInfo?.max_projects ?? "-"}</span></p>
-              <p>Max Users: <span className="font-medium">{workspaceInfo?.max_users ?? "-"}</span></p>
+              <p>Max Projects (Tenant): <span className="font-medium">{workspaceInfo?.max_projects ?? "-"}</span></p>
+              <p>Max Workspace Members: <span className="font-medium">{workspaceInfo?.max_users ?? "-"}</span></p>
               {subscription?.is_active ? (
                 <p className="inline-flex items-center gap-1.5 text-success-foreground">
                   <CheckCircle2 className="h-4 w-4" />
@@ -155,8 +155,8 @@ export default function Billing() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-2xl font-semibold">₹{(Number(plan.price || 0) / 100).toFixed(2)}</p>
-                <p className="text-sm text-muted-foreground">Projects: {plan.max_projects}</p>
-                <p className="text-sm text-muted-foreground">Users: {plan.max_users}</p>
+                <p className="text-sm text-muted-foreground">Tenant Projects: {plan.max_projects}</p>
+                <p className="text-sm text-muted-foreground">Workspace Members: {plan.max_users}</p>
 
                 <Button
                   className="h-11 w-full"

@@ -16,6 +16,16 @@ const pageTitles = {
   "/reports": "Reports"
 };
 
+const searchTargets = [
+  { label: "Dashboard", href: "/dashboard", keywords: ["home", "overview", "stats"] },
+  { label: "Projects", href: "/projects", keywords: ["project", "board", "kanban"] },
+  { label: "Tasks", href: "/tasks", keywords: ["task", "todo", "work"] },
+  { label: "Members", href: "/members", keywords: ["users", "team", "workspace"] },
+  { label: "Notifications", href: "/notifications", keywords: ["alerts", "activity"] },
+  { label: "Billing", href: "/billing", keywords: ["plan", "subscription", "payment"] },
+  { label: "Reports", href: "/reports", keywords: ["analytics", "metrics", "reporting"] }
+];
+
 export default function Topbar({ onToggleMobileSidebar }) {
   const { logout, user } = useAuth();
   const { tenant, setTenant } = useTenant();
@@ -33,6 +43,27 @@ export default function Topbar({ onToggleMobileSidebar }) {
     if (location.pathname.startsWith("/projects/") && location.pathname.includes("/board")) return "Project Board";
     return pageTitles[location.pathname] || "Workspace";
   }, [location.pathname]);
+
+  const filteredTargets = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return searchTargets;
+
+    return searchTargets.filter((item) => {
+      const haystack = `${item.label} ${item.keywords.join(" ")}`.toLowerCase();
+      return haystack.includes(normalized);
+    });
+  }, [query]);
+
+  const navigateToSearchTarget = (href) => {
+    navigate(href);
+    setSearchOpen(false);
+  };
+
+  const submitSearch = (event) => {
+    event?.preventDefault?.();
+    if (!filteredTargets.length) return;
+    navigateToSearchTarget(filteredTargets[0].href);
+  };
 
   const toggleTheme = () => {
     document.documentElement.classList.toggle("light");
@@ -67,15 +98,15 @@ export default function Topbar({ onToggleMobileSidebar }) {
                 </div>
               </div>
 
-              <div className="relative min-w-[260px] max-w-[440px] flex-1">
+              <form className="relative min-w-[260px] max-w-[440px] flex-1" onSubmit={submitSearch}>
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search tasks, projects, members..."
+                  placeholder="Search pages..."
                   className="pl-9"
                 />
-              </div>
+              </form>
             </div>
           </div>
 
@@ -84,7 +115,7 @@ export default function Topbar({ onToggleMobileSidebar }) {
               <Search className="h-4 w-4" />
             </Button>
 
-            <Button variant="secondary" size="sm" className="relative h-10 w-10 rounded-xl p-0" onClick={() => navigate("/notifications")}> 
+            <Button variant="secondary" size="sm" className="relative h-10 w-10 rounded-xl p-0" onClick={() => navigate("/notifications")}>
               <Bell className="h-4 w-4" />
               <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-primary-hover" />
             </Button>
@@ -120,14 +151,30 @@ export default function Topbar({ onToggleMobileSidebar }) {
               <X className="h-4 w-4" />
             </button>
           </div>
-          <Input
-            autoFocus
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search tasks, projects, members..."
-          />
-          <div className="mt-4 rounded-xl border border-dashed border-border/80 p-3 text-xs text-muted-foreground">
-            Search suggestions can be wired to your global search endpoint.
+
+          <form onSubmit={submitSearch}>
+            <Input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search pages..."
+            />
+          </form>
+
+          <div className="mt-3 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-border/70 bg-background/60 p-2">
+            {filteredTargets.length ? (
+              filteredTargets.map((item) => (
+                <button
+                  key={item.href}
+                  className="flex h-10 w-full items-center rounded-lg px-2 text-left text-sm text-foreground/90 transition hover:bg-muted/55"
+                  onClick={() => navigateToSearchTarget(item.href)}
+                >
+                  {item.label}
+                </button>
+              ))
+            ) : (
+              <p className="px-2 py-2 text-xs text-muted-foreground">No matching pages.</p>
+            )}
           </div>
 
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
