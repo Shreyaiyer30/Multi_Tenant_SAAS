@@ -6,6 +6,14 @@ from pathlib import Path
 
 from corsheaders.defaults import default_headers
 from dotenv import load_dotenv
+import os
+import dj_database_url
+
+DATABASES = {
+    "default": dj_database_url.config(
+        default=os.environ.get("DATABASE_URL")
+    )
+}
 
 load_dotenv()
 
