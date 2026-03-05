@@ -25,6 +25,8 @@ class Project(UUIDModel, TimeStampedModel, TenantScopedModel):
             models.Index(fields=["tenant", "id"]),
             models.Index(fields=["tenant", "created_at"]),
             models.Index(fields=["tenant", "status"]),
+            models.Index(fields=["tenant", "name"]),
+            models.Index(fields=["tenant", "created_by"]),
         ]
         constraints = [
             models.CheckConstraint(

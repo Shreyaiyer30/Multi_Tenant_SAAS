@@ -1,8 +1,9 @@
-from django.db.models import Count
+from django.db.models import Count, Q
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.audit.services import log_event
 from apps.common.mixins import TenantScopedQuerysetMixin
 from apps.common.permissions import IsTenantAdminOrOwner, IsTenantMember, IsTenantOwner, PlanLimitPermission
 from apps.projects.models import Project, ProjectMember
@@ -35,6 +36,75 @@ class ProjectViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
             user=self.request.user,
             defaults={"role": ProjectMember.Role.ADMIN, "added_by": self.request.user},
         )
+        log_event(
+            self.request.tenant,
+            self.request.user,
+            "PROJECT_CREATED",
+            entity=serializer.instance,
+            metadata={
+                "entity_type": "project",
+                "project_id": str(serializer.instance.id),
+                "project_name": serializer.instance.name,
+            },
+        )
+
+    def perform_update(self, serializer):
+        serializer.save()
+        project = serializer.instance
+        log_event(
+            self.request.tenant,
+            self.request.user,
+            "PROJECT_UPDATED",
+            entity=project,
+            metadata={
+                "entity_type": "project",
+                "project_id": str(project.id),
+                "project_name": project.name,
+            },
+        )
+
+    def perform_destroy(self, instance):
+        project_id = str(instance.id)
+        project_name = instance.name
+        log_event(
+            self.request.tenant,
+            self.request.user,
+            "PROJECT_DELETED",
+            entity=instance,
+            metadata={
+                "entity_type": "project",
+                "project_id": project_id,
+                "project_name": project_name,
+            },
+        )
+        instance.delete()
+
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
+        qp = self.request.query_params
+
+        if qp.get("status"):
+            queryset = queryset.filter(status__in=qp["status"].split(","))
+        if qp.get("created_by"):
+            queryset = queryset.filter(created_by_id=qp["created_by"])
+        if qp.get("member"):
+            queryset = queryset.filter(members__user_id=qp["member"])
+        if qp.get("search"):
+            query = qp["search"].strip()
+            queryset = queryset.filter(Q(name__icontains=query) | Q(description__icontains=query))
+        if qp.get("created_after"):
+            queryset = queryset.filter(created_at__date__gte=qp["created_after"])
+        if qp.get("created_before"):
+            queryset = queryset.filter(created_at__date__lte=qp["created_before"])
+
+        ordering = qp.get("ordering")
+        allowed = {"created_at", "updated_at", "name", "status", "completion_percent"}
+        if ordering:
+            field = ordering.lstrip("-")
+            if field in allowed:
+                queryset = queryset.order_by(ordering)
+
+        return queryset.distinct()
 
     @action(detail=True, methods=["get"])
     def board(self, request, pk=None):
@@ -96,6 +166,18 @@ class ProjectViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         if obj.role != role:
             obj.role = role
             obj.save(update_fields=["role", "updated_at"])
+        log_event(
+            request.tenant,
+            request.user,
+            "PROJECT_MEMBER_ADDED",
+            entity=project,
+            metadata={
+                "entity_type": "project",
+                "project_id": str(project.id),
+                "project_name": project.name,
+                "member_user_id": str(user_id),
+            },
+        )
 
         return Response(ProjectMemberSerializer(obj).data, status=status.HTTP_201_CREATED)
 
@@ -111,6 +193,18 @@ class ProjectViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         deleted = project.members.filter(user_id=user_id, tenant=request.tenant).delete()[0]
         if not deleted:
             return Response({"error": "not_found"}, status=status.HTTP_404_NOT_FOUND)
+        log_event(
+            request.tenant,
+            request.user,
+            "PROJECT_MEMBER_REMOVED",
+            entity=project,
+            metadata={
+                "entity_type": "project",
+                "project_id": str(project.id),
+                "project_name": project.name,
+                "member_user_id": str(user_id),
+            },
+        )
         
         # Unassign tasks
         project.tasks.filter(assignee_id=user_id).update(assignee=None, updated_at=__import__("django.utils.timezone").utils.timezone.now())

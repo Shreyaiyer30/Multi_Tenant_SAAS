@@ -1,6 +1,10 @@
 import logging
 
 from django.http import JsonResponse
+from django.http import Http404
+from rest_framework.exceptions import PermissionDenied
+
+from apps.tenants.services import get_active_workspace
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +23,7 @@ class TenantMiddleware:
         "/api/v1/notifications/read/",
         "/api/v1/notifications/unread/",
         "/api/v1/billing/webhook/",
+        "/api/v1/invites/",
         "/api/v1/schema/",
         "/api/v1/docs/",
         "/api/v1/workspaces/",
@@ -57,52 +62,27 @@ class TenantMiddleware:
             )
             return self.get_response(request)
 
-        if not tenant_slug:
-            logger.warning(
-                "tenant_middleware_missing_header path=%s user_id=%s user_email=%s",
-                request.path,
-                user_id,
-                user_email,
-            )
-            return JsonResponse({"error": "missing_tenant_header"}, status=400)
-
-        from apps.tenants.models import Membership, Tenant
-
         try:
-            tenant = Tenant.objects.get(slug=tenant_slug)
-        except Tenant.DoesNotExist:
+            tenant = get_active_workspace(request)
+            membership = request.membership
+        except Http404 as exc:
+            code = str(exc) or "tenant_not_found"
             logger.warning(
-                "tenant_middleware_not_found path=%s user_id=%s user_email=%s x_tenant=%s",
+                "tenant_middleware_not_found path=%s user_id=%s user_email=%s x_tenant=%s code=%s",
                 request.path,
                 user_id,
                 user_email,
                 tenant_slug,
+                code,
             )
-            return JsonResponse({"error": "tenant_not_found"}, status=404)
-
-        if not tenant.is_active:
+            return JsonResponse({"error": code}, status=404)
+        except PermissionDenied:
             logger.warning(
-                "tenant_middleware_inactive path=%s user_id=%s user_email=%s x_tenant=%s",
+                "tenant_middleware_access_denied path=%s user_id=%s user_email=%s x_tenant=%s",
                 request.path,
                 user_id,
                 user_email,
                 tenant_slug,
-            )
-            return JsonResponse({"error": "tenant_inactive"}, status=403)
-
-        try:
-            membership = Membership.objects.select_related("tenant", "user").get(
-                tenant=tenant,
-                user=request.user,
-            )
-        except Membership.DoesNotExist:
-            logger.warning(
-                "tenant_middleware_access_denied path=%s user_id=%s user_email=%s x_tenant=%s tenant_resolved=%s",
-                request.path,
-                user_id,
-                user_email,
-                tenant_slug,
-                tenant.slug,
             )
             return JsonResponse({"error": "tenant_access_denied"}, status=403)
 
@@ -115,6 +95,4 @@ class TenantMiddleware:
             tenant.slug,
             membership.role,
         )
-        request.tenant = tenant
-        request.membership = membership
         return self.get_response(request)

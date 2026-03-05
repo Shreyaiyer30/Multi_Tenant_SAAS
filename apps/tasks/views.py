@@ -41,7 +41,7 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         qp = self.request.query_params
 
         if qp.get("project"):
-            queryset = queryset.filter(project_id=qp["project"])
+            queryset = queryset.filter(project_id__in=qp["project"].split(","))
         if qp.get("status"):
             queryset = queryset.filter(status__in=qp["status"].split(","))
         if qp.get("priority"):
@@ -58,6 +58,9 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
             queryset = queryset.filter(due_date__gte=qp["due_date_after"])
         if qp.get("overdue") == "true":
             queryset = queryset.filter(due_date__lt=__import__("django.utils.timezone").utils.timezone.localdate()).exclude(status=Task.Status.DONE)
+        completed = qp.get("completed")
+        if completed in {"true", "false"}:
+            queryset = queryset.filter(status=Task.Status.DONE) if completed == "true" else queryset.exclude(status=Task.Status.DONE)
         if qp.get("search"):
             queryset = queryset.filter(Q(title__icontains=qp["search"]) | Q(description__icontains=qp["search"]))
 
@@ -71,6 +74,9 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         TaskService.create_task(request=self.request, serializer=serializer, actor=self.request.user)
+
+    def perform_destroy(self, instance):
+        TaskService.delete_task(request=self.request, task=instance, actor=self.request.user)
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
@@ -95,17 +101,22 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         status_to = request.data.get("status", task.status)
         position = request.data.get("position")
 
+        if status_to != task.status:
+            TaskService.update_task(
+                request=request,
+                task=task,
+                validated_data={"status": status_to},
+                actor=request.user,
+                auto_assign=False,
+            )
+
         with transaction.atomic():
-            if status_to != task.status:
-                task.status = status_to
-            # Keep progress consistent with status on board moves.
-            task.progress_percent = 100 if task.status == Task.Status.DONE else 0
             if position is None:
                 max_pos = Task.objects.filter(tenant=request.tenant, project=task.project, status=task.status).exclude(id=task.id).order_by("-position").values_list("position", flat=True).first()
                 task.position = 0 if max_pos is None else max_pos + 1
             else:
                 task.position = max(int(position), 0)
-            task.save(update_fields=["status", "progress_percent", "position", "updated_at"])
+            task.save(update_fields=["position", "updated_at"])
 
         return Response(TaskSerializer(task, context={"request": request}).data)
 

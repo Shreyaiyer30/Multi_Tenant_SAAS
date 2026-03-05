@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bell, ChevronDown, Menu, Moon, Search, Sun, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import api from "@/api/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
@@ -33,6 +34,9 @@ export default function Topbar({ onToggleMobileSidebar }) {
   const location = useLocation();
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [projectResults, setProjectResults] = useState([]);
+  const [taskResults, setTaskResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   const currentWorkspace = useMemo(() => {
     const workspaces = user?.workspaces || [];
@@ -54,6 +58,42 @@ export default function Topbar({ onToggleMobileSidebar }) {
     });
   }, [query]);
 
+  useEffect(() => {
+    const normalized = query.trim();
+    if (!normalized) {
+      setProjectResults([]);
+      setTaskResults([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    let active = true;
+    setSearchLoading(true);
+    const timeoutId = setTimeout(async () => {
+      try {
+        const [projectRes, taskRes] = await Promise.all([
+          api.get("projects/", { params: { search: normalized, ordering: "-updated_at" } }),
+          api.get("tasks/", { params: { search: normalized, ordering: "-updated_at" } })
+        ]);
+
+        if (!active) return;
+        setProjectResults((projectRes.data?.results || projectRes.data || []).slice(0, 5));
+        setTaskResults((taskRes.data?.results || taskRes.data || []).slice(0, 5));
+      } catch {
+        if (!active) return;
+        setProjectResults([]);
+        setTaskResults([]);
+      } finally {
+        if (active) setSearchLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
+  }, [query]);
+
   const navigateToSearchTarget = (href) => {
     navigate(href);
     setSearchOpen(false);
@@ -61,8 +101,17 @@ export default function Topbar({ onToggleMobileSidebar }) {
 
   const submitSearch = (event) => {
     event?.preventDefault?.();
-    if (!filteredTargets.length) return;
-    navigateToSearchTarget(filteredTargets[0].href);
+    if (projectResults.length) {
+      navigateToSearchTarget(`/projects/${projectResults[0].id}/board`);
+      return;
+    }
+    if (taskResults.length) {
+      navigateToSearchTarget("/tasks");
+      return;
+    }
+    if (filteredTargets.length) {
+      navigateToSearchTarget(filteredTargets[0].href);
+    }
   };
 
   const toggleTheme = () => {
@@ -161,20 +210,57 @@ export default function Topbar({ onToggleMobileSidebar }) {
             />
           </form>
 
-          <div className="mt-3 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-border/70 bg-background/60 p-2">
-            {filteredTargets.length ? (
-              filteredTargets.map((item) => (
-                <button
-                  key={item.href}
-                  className="flex h-10 w-full items-center rounded-lg px-2 text-left text-sm text-foreground/90 transition hover:bg-muted/55"
-                  onClick={() => navigateToSearchTarget(item.href)}
-                >
-                  {item.label}
-                </button>
-              ))
-            ) : (
-              <p className="px-2 py-2 text-xs text-muted-foreground">No matching pages.</p>
-            )}
+          <div className="mt-3 max-h-64 space-y-2 overflow-y-auto rounded-xl border border-border/70 bg-background/60 p-2">
+            {searchLoading ? <p className="px-2 py-2 text-xs text-muted-foreground">Searching...</p> : null}
+
+            {projectResults.length ? (
+              <div className="space-y-1">
+                <p className="px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Projects</p>
+                {projectResults.map((project) => (
+                  <button
+                    key={project.id}
+                    className="flex w-full items-center rounded-lg px-2 py-2 text-left text-sm text-foreground/90 transition hover:bg-muted/55"
+                    onClick={() => navigateToSearchTarget(`/projects/${project.id}/board`)}
+                  >
+                    {project.name}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {taskResults.length ? (
+              <div className="space-y-1">
+                <p className="px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tasks</p>
+                {taskResults.map((task) => (
+                  <button
+                    key={task.id}
+                    className="flex w-full items-center rounded-lg px-2 py-2 text-left text-sm text-foreground/90 transition hover:bg-muted/55"
+                    onClick={() => navigateToSearchTarget("/tasks")}
+                  >
+                    {task.title}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {!query.trim() ? (
+              <div className="space-y-1">
+                <p className="px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Pages</p>
+                {filteredTargets.map((item) => (
+                  <button
+                    key={item.href}
+                    className="flex h-10 w-full items-center rounded-lg px-2 text-left text-sm text-foreground/90 transition hover:bg-muted/55"
+                    onClick={() => navigateToSearchTarget(item.href)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {!searchLoading && query.trim() && !projectResults.length && !taskResults.length ? (
+              <p className="px-2 py-2 text-xs text-muted-foreground">No matching projects or tasks.</p>
+            ) : null}
           </div>
 
           <div className="mt-3 grid gap-2 sm:grid-cols-2">

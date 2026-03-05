@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import api from "@/api/api";
 import TaskModal from "@/components/TaskModal";
 import TaskCreateModal from "@/components/TaskCreateModal";
@@ -55,6 +56,18 @@ export default function Tasks() {
     loadTasks();
   }, [tenant]);
 
+  const handleDeleteTask = async (taskId) => {
+    if (!window.confirm("Delete this task? This action cannot be undone.")) return;
+    try {
+      await api.delete(`tasks/${taskId}/`);
+      toast.success("Task deleted");
+      setTasks((prev) => prev.filter((task) => task.id !== taskId));
+      if (selectedTask?.id === taskId) setSelectedTask(null);
+    } catch {
+      toast.error("Unable to delete task");
+    }
+  };
+
   return (
     <Card className="min-w-0">
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -64,14 +77,21 @@ export default function Tasks() {
       <CardContent>
         <div className="sm:hidden space-y-2">
           {tasks.map((task) => (
-            <button key={task.id} className="w-full rounded-xl border border-border/70 bg-card-elevated/45 p-3 text-left" onClick={() => setSelectedTask(task)}>
-              <p className="line-clamp-2 text-sm font-medium">{task.title}</p>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                <p>Status: <span className="text-foreground">{task.status}</span></p>
-                <p>Priority: <span className="text-foreground">{task.priority}</span></p>
-                <p className="col-span-2 truncate">Assignee: <span className="text-foreground">{assigneeNameById[task.assignee] || "Unassigned"}</span></p>
+            <div key={task.id} className="w-full rounded-xl border border-border/70 bg-card-elevated/45 p-3 text-left">
+              <button className="w-full text-left" onClick={() => setSelectedTask(task)}>
+                <p className="line-clamp-2 text-sm font-medium">{task.title}</p>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                  <p>Status: <span className="text-foreground">{task.status}</span></p>
+                  <p>Priority: <span className="text-foreground">{task.priority}</span></p>
+                  <p className="col-span-2 truncate">Assignee: <span className="text-foreground">{assigneeNameById[task.assignee] || "Unassigned"}</span></p>
+                </div>
+              </button>
+              <div className="mt-3">
+                <Button variant="destructive" size="sm" className="h-9 w-full" onClick={() => handleDeleteTask(task.id)}>
+                  Delete Task
+                </Button>
               </div>
-            </button>
+            </div>
           ))}
           {!tasks.length ? <p className="text-sm text-muted-foreground">No tasks yet.</p> : null}
         </div>
@@ -84,6 +104,7 @@ export default function Tasks() {
                 <TH>Status</TH>
                 <TH>Priority</TH>
                 <TH>Assignee</TH>
+                <TH>Actions</TH>
               </TR>
             </THead>
             <TBody>
@@ -93,6 +114,19 @@ export default function Tasks() {
                   <TD>{task.status}</TD>
                   <TD>{task.priority}</TD>
                   <TD>{assigneeNameById[task.assignee] || "Unassigned"}</TD>
+                  <TD>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="h-8"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleDeleteTask(task.id);
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </TD>
                 </TR>
               ))}
             </TBody>
@@ -100,7 +134,16 @@ export default function Tasks() {
         </div>
       </CardContent>
       <TaskCreateModal open={openCreate} onOpenChange={setOpenCreate} onCreated={loadTasks} projects={projects} />
-      <TaskModal task={selectedTask} open={Boolean(selectedTask)} onOpenChange={(open) => !open && setSelectedTask(null)} onUpdated={loadTasks} />
+      <TaskModal
+        task={selectedTask}
+        open={Boolean(selectedTask)}
+        onOpenChange={(open) => !open && setSelectedTask(null)}
+        onUpdated={loadTasks}
+        onDeleted={(taskId) => {
+          setTasks((prev) => prev.filter((task) => task.id !== taskId));
+          setSelectedTask(null);
+        }}
+      />
     </Card>
   );
 }

@@ -73,13 +73,30 @@ class RegisterAPIView(APIView):
 
         user = result["user"]
         workspace = result["workspace"]
+        memberships = (
+            Membership.objects.filter(user=user)
+            .select_related("tenant")
+            .order_by("joined_at")
+        )
         refresh = RefreshToken.for_user(user)
+        workspaces = [
+            {
+                "id": membership.tenant.id,
+                "name": membership.tenant.name,
+                "slug": membership.tenant.slug,
+                "plan": membership.tenant.plan,
+                "role": membership.role,
+            }
+            for membership in memberships
+        ]
 
         data = {
             "access": str(refresh.access_token),
             "refresh": str(refresh),
             "user": UserSerializer(user).data,
             "workspace": None,
+            "active_workspace": workspace.slug if workspace else (workspaces[0]["slug"] if workspaces else ""),
+            "workspaces": workspaces,
         }
 
         if workspace:
@@ -113,11 +130,28 @@ class LoginAPIView(APIView):
         user = serializer.validated_data["user"]
 
         refresh = RefreshToken.for_user(user)
+        memberships = (
+            Membership.objects.filter(user=user)
+            .select_related("tenant")
+            .order_by("joined_at")
+        )
+        workspaces = [
+            {
+                "id": membership.tenant.id,
+                "name": membership.tenant.name,
+                "slug": membership.tenant.slug,
+                "plan": membership.tenant.plan,
+                "role": membership.role,
+            }
+            for membership in memberships
+        ]
         return Response(
             {
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
                 "user": UserSerializer(user).data,
+                "active_workspace": workspaces[0]["slug"] if workspaces else "",
+                "workspaces": workspaces,
             },
             status=status.HTTP_200_OK,
         )

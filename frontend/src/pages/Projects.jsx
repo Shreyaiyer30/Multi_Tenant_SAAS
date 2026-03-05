@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import api from "@/api/api";
 import ProjectModal from "@/components/ProjectModal";
 import ProjectMembersModal from "@/components/ProjectMembersModal";
@@ -34,6 +35,17 @@ export default function Projects() {
       .catch(() => setWorkspaceMembers([]));
   };
 
+  const handleDeleteProject = async (projectId) => {
+    if (!window.confirm("Delete this project? This action cannot be undone.")) return;
+    try {
+      await api.delete(`projects/${projectId}/`);
+      toast.success("Project deleted");
+      setProjects((prev) => prev.filter((project) => project.id !== projectId));
+    } catch {
+      toast.error("Unable to delete project");
+    }
+  };
+
   useEffect(() => {
     loadProjects();
     loadWorkspaceMembers();
@@ -59,17 +71,27 @@ export default function Projects() {
             </CardHeader>
             <CardContent className="space-y-2">
               <p className="line-clamp-2 text-sm text-muted-foreground">{project.description || "No description"}</p>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="h-11 w-full sm:w-auto"
-                onClick={() => {
-                  setSelectedProject(project);
-                  setMembersOpen(true);
-                }}
-              >
-                Manage Members
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-11 w-full sm:w-auto"
+                  onClick={() => {
+                    setSelectedProject(project);
+                    setMembersOpen(true);
+                  }}
+                >
+                  Manage Members
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="h-11 w-full sm:w-auto"
+                  onClick={() => handleDeleteProject(project.id)}
+                >
+                  Delete
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}

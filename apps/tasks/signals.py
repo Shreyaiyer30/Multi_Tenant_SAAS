@@ -1,5 +1,6 @@
 import uuid
 
+from django.db import IntegrityError
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
@@ -24,7 +25,7 @@ def track_task_changes(sender, instance, **kwargs):
     if not instance.pk:
         return
     try:
-        old = Task.objects.get(pk=instance.pk)
+        old = Task.objects.get(pk=instance.pk, tenant_id=instance.tenant_id)
     except Task.DoesNotExist:
         return
 
@@ -84,12 +85,27 @@ def comment_added_activity(sender, instance, created, **kwargs):
 
 
 @receiver(post_delete, sender=Comment)
-def comment_deleted_activity(sender, instance, **kwargs):
-    ActivityEvent.objects.create(
-        id=uuid.uuid4(),
-        tenant=instance.tenant,
-        task=instance.task,
-        actor=instance.author,
-        event_type=ActivityEvent.EventType.COMMENT_DELETED,
-        data={"comment_id": str(instance.id)},
-    )
+def comment_deleted_activity(sender, instance, origin=None, **kwargs):
+    # Only record explicit comment deletions; skip cascade deletes from task/project removal.
+    if origin is not None:
+        origin_model = getattr(origin, "model", None)
+        if origin_model is None and getattr(origin, "_meta", None) is not None:
+            origin_model = origin._meta.model
+        if origin_model is not None and origin_model is not Comment:
+            return
+
+    task_id = instance.task_id
+    if not task_id or not Task.objects.filter(id=task_id, tenant_id=instance.tenant_id).exists():
+        return
+    try:
+        ActivityEvent.objects.create(
+            id=uuid.uuid4(),
+            tenant_id=instance.tenant_id,
+            task_id=task_id,
+            actor_id=instance.author_id,
+            event_type=ActivityEvent.EventType.COMMENT_DELETED,
+            data={"comment_id": str(instance.id)},
+        )
+    except IntegrityError:
+        # During task/project cascade deletes, the task row can disappear before this signal inserts.
+        return

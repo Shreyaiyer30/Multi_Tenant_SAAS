@@ -37,6 +37,8 @@ class Task(UUIDModel, TimeStampedModel, TenantScopedModel):
             models.Index(fields=["tenant", "status"]),
             models.Index(fields=["tenant", "priority"]),
             models.Index(fields=["tenant", "assignee", "status"]),
+            models.Index(fields=["tenant", "due_date"]),
+            models.Index(fields=["tenant", "project", "status"]),
         ]
         constraints = [
             models.CheckConstraint(

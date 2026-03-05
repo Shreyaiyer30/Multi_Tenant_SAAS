@@ -35,9 +35,11 @@ export default function Notifications() {
 
   const mark = async (id, read) => {
     try {
-      const mode = read ? "unread" : "read";
-      await api.post(`notifications/${mode}/`, { ids: [id] });
-      setItems((prev) => prev.map((it) => (it.id === id ? { ...it, is_read: !read } : it)));
+      if (read) {
+        return;
+      }
+      await api.post("notifications/mark-read/", { ids: [id] });
+      setItems((prev) => prev.map((it) => (it.id === id ? { ...it, is_read: true } : it)));
     } catch {
       // no-op to keep list stable
     }
@@ -45,7 +47,7 @@ export default function Notifications() {
 
   const markAllRead = async () => {
     try {
-      await api.post("notifications/read/", { all: true });
+      await api.post("notifications/mark-all-read/");
       setItems((prev) => prev.map((it) => ({ ...it, is_read: true })));
     } catch {
       // no-op to keep list stable
@@ -53,7 +55,7 @@ export default function Notifications() {
   };
 
   const unread = useMemo(() => items.filter((i) => !i.is_read), [items]);
-  const mentions = useMemo(() => items.filter((i) => i.event_type === "mention"), [items]);
+  const mentions = useMemo(() => items.filter((i) => i.type === "mention"), [items]);
 
   return (
     <Card>
@@ -95,10 +97,10 @@ function Row({ item, onToggle, onOpen }) {
 
   return (
     <div className={`flex items-center justify-between rounded-md border p-3 ${!item.is_read ? "bg-muted/40" : ""}`}>
-      <p className="text-sm">{item.body}</p>
+      <p className="text-sm">{item.message}</p>
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" onClick={openTarget}>Open</Button>
-        <Button variant="ghost" size="sm" onClick={() => onToggle(item.id, item.is_read)}>{item.is_read ? "Mark unread" : "Mark read"}</Button>
+        <Button variant="ghost" size="sm" onClick={() => onToggle(item.id, item.is_read)}>{item.is_read ? "Read" : "Mark read"}</Button>
       </div>
     </div>
   );

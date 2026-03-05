@@ -1,5 +1,8 @@
+import secrets
+
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from apps.common.models import TimeStampedModel, UUIDModel
 
@@ -29,6 +32,7 @@ class Membership(UUIDModel):
         OWNER = "owner", "Owner"
         ADMIN = "admin", "Admin"
         MEMBER = "member", "Member"
+        VIEWER = "viewer", "Viewer"
 
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="memberships")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="memberships")
@@ -103,3 +107,70 @@ class WorkspaceSubscription(TimeStampedModel):
 
     def __str__(self):
         return f"{self.workspace.slug}::{self.plan.name if self.plan else 'none'}"
+
+
+def _default_invite_token():
+    return secrets.token_urlsafe(32)
+
+
+class WorkspaceInvite(UUIDModel, TimeStampedModel):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="invites")
+    email = models.EmailField()
+    role = models.CharField(max_length=20, choices=Membership.Role.choices, default=Membership.Role.MEMBER)
+    token = models.CharField(max_length=255, unique=True, default=_default_invite_token)
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="workspace_invites_sent",
+        null=True,
+        blank=True,
+    )
+    expires_at = models.DateTimeField()
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["tenant", "email"]),
+            models.Index(fields=["tenant", "created_at"]),
+        ]
+
+    @property
+    def is_expired(self):
+        return self.expires_at <= timezone.now()
+
+    @property
+    def is_active(self):
+        return self.accepted_at is None and self.revoked_at is None and not self.is_expired
+
+
+class BillingWebhookEvent(TimeStampedModel):
+    class Status(models.TextChoices):
+        RECEIVED = "received", "Received"
+        PROCESSED = "processed", "Processed"
+        IGNORED = "ignored", "Ignored"
+        FAILED = "failed", "Failed"
+
+    event_id = models.CharField(max_length=255, unique=True)
+    event_type = models.CharField(max_length=120, blank=True)
+    signature = models.CharField(max_length=255, blank=True)
+    payload = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.RECEIVED)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    workspace = models.ForeignKey(Tenant, on_delete=models.SET_NULL, null=True, blank=True, related_name="billing_webhook_events")
+    subscription = models.ForeignKey(
+        WorkspaceSubscription,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="webhook_events",
+    )
+    failure_reason = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["event_type", "status"]),
+            models.Index(fields=["workspace", "created_at"]),
+        ]

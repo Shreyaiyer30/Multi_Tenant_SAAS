@@ -7,6 +7,8 @@ api_urlpatterns = [
     path("auth/", include("apps.accounts.urls")),
     path("", include("apps.tenants.urls")),
     path("", include("apps.projects.urls")),
+    path("", include("apps.dashboard.urls")),
+    path("", include("apps.notifications.urls")),
     path("", include("apps.tasks.urls")),
     path("", include("apps.reporting.urls")),
 ]

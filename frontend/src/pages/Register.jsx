@@ -18,9 +18,7 @@ export default function Register() {
     first_name: "",
     last_name: "",
     email: "",
-    password: "",
-    create_workspace: true,
-    workspace_name: ""
+    password: ""
   });
 
   const submit = async (e) => {
@@ -33,9 +31,6 @@ export default function Register() {
       localErrors.password = "Password must include at least one uppercase letter.";
     } else if (!/\d/.test(form.password)) {
       localErrors.password = "Password must include at least one digit.";
-    }
-    if (form.create_workspace && !form.workspace_name.trim()) {
-      localErrors.workspace_name = "This field is required when create_workspace is true.";
     }
     if (Object.keys(localErrors).length) {
       setErrors(localErrors);
@@ -117,12 +112,6 @@ export default function Register() {
               </button>
             </div>
             {errors.password ? <p className="text-xs text-danger-foreground">{errors.password}</p> : null}
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={form.create_workspace} onChange={(e) => setForm((p) => ({ ...p, create_workspace: e.target.checked }))} />
-              Create a new workspace
-            </label>
-            {form.create_workspace ? <Input placeholder="Workspace name" value={form.workspace_name} onChange={(e) => setForm((p) => ({ ...p, workspace_name: e.target.value }))} required /> : null}
-            {errors.workspace_name ? <p className="text-xs text-danger-foreground">{errors.workspace_name}</p> : null}
             {apiError ? <p className="text-xs text-danger-foreground">{apiError}</p> : null}
             <Button className="w-full" disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create account"}

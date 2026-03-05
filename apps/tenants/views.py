@@ -1,20 +1,27 @@
-from django.db.models import Count, Q
+import json
+
+from django.db.models import Count
 from django.http import Http404
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
-import razorpay
 from django.conf import settings
+from rest_framework.permissions import AllowAny
 
 from apps.common.permissions import IsTenantAdminOrOwner, IsTenantMember, IsTenantOwner, PlanLimitPermission
 from apps.tasks.models import ActivityEvent, Task
-from apps.tenants.models import Membership, SubscriptionPlan, WorkspaceSubscription
+from apps.tenants.models import BillingWebhookEvent, Membership, SubscriptionPlan, WorkspaceInvite, WorkspaceSubscription
+from apps.tenants.services import process_razorpay_event, verify_razorpay_webhook_signature, webhook_event_id
 from apps.tenants.serializers import (
+    InviteAcceptSerializer,
+    InviteTokenPreviewSerializer,
     MembershipInviteSerializer,
     MembershipRoleUpdateSerializer,
     MembershipSerializer,
+    WorkspaceInviteCreateSerializer,
+    WorkspaceInviteSerializer,
     SubscriptionPlanSerializer,
     TenantCreateSerializer,
     TenantSerializer,
@@ -55,6 +62,59 @@ class MembershipListCreateAPIView(APIView):
         serializer.is_valid(raise_exception=True)
         membership = serializer.save()
         return Response(MembershipSerializer(membership).data, status=status.HTTP_201_CREATED)
+
+
+class WorkspaceInviteListCreateAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsTenantMember, IsTenantAdminOrOwner]
+
+    def get(self, request):
+        rows = WorkspaceInvite.objects.filter(tenant=request.tenant).select_related("tenant").order_by("-created_at")
+        return Response(WorkspaceInviteSerializer(rows, many=True).data)
+
+    def post(self, request):
+        serializer = WorkspaceInviteCreateSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        invite = serializer.save()
+        return Response(WorkspaceInviteSerializer(invite).data, status=status.HTTP_201_CREATED)
+
+
+class WorkspaceInvitePreviewAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, token):
+        serializer = InviteTokenPreviewSerializer(data={"token": token})
+        serializer.is_valid(raise_exception=True)
+        invite = serializer.context["invite"]
+        return Response(
+            {
+                "valid": invite.is_active,
+                "email": invite.email,
+                "role": invite.role,
+                "workspace": {"id": invite.tenant_id, "slug": invite.tenant.slug, "name": invite.tenant.name},
+                "expires_at": invite.expires_at,
+                "accepted_at": invite.accepted_at,
+            }
+        )
+
+
+class WorkspaceInviteAcceptAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = InviteAcceptSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        membership = serializer.save()
+        return Response(
+            {
+                "success": True,
+                "workspace": {
+                    "id": membership.tenant_id,
+                    "slug": membership.tenant.slug,
+                    "name": membership.tenant.name,
+                    "role": membership.role,
+                },
+            }
+        )
 
 
 class MembershipDetailAPIView(APIView):
@@ -169,20 +229,20 @@ def _ensure_default_plans():
         {
             "name": "Pro",
             "code": SubscriptionPlan.Code.PRO,
-            "price": 99900,
-            "max_projects": 100,
+            "price": 59900,
+            "max_projects": 50,
             "max_users": 50,
         },
         {
             "name": "Enterprise",
             "code": SubscriptionPlan.Code.ENTERPRISE,
-            "price": 299900,
-            "max_projects": 1000,
+            "price": 99900,
+            "max_projects": 100,
             "max_users": 500,
         },
     ]
     for item in defaults:
-        SubscriptionPlan.objects.get_or_create(
+        SubscriptionPlan.objects.update_or_create(
             name=item["name"],
             defaults=item,
         )
@@ -214,6 +274,8 @@ class BillingCreateOrderAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsTenantMember, IsTenantOwner]
 
     def post(self, request):
+        import razorpay
+
         plan_id = request.data.get("plan_id")
         if not plan_id:
             return Response({"error": "validation_error", "detail": {"plan_id": ["This field is required."]}}, status=status.HTTP_400_BAD_REQUEST)
@@ -261,6 +323,8 @@ class BillingVerifyPaymentAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsTenantMember, IsTenantOwner]
 
     def post(self, request):
+        import razorpay
+
         order_id = request.data.get("razorpay_order_id")
         payment_id = request.data.get("razorpay_payment_id")
         signature = request.data.get("razorpay_signature")
@@ -316,3 +380,50 @@ class BillingVerifyPaymentAPIView(APIView):
                 "subscription": WorkspaceSubscriptionSerializer(subscription).data,
             }
         )
+
+
+class BillingWebhookAPIView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        signature = request.headers.get("X-Razorpay-Signature", "")
+        raw_body = request.body
+
+        if not verify_razorpay_webhook_signature(raw_body, signature):
+            return Response({"error": "invalid_signature"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            payload = json.loads(raw_body.decode("utf-8") or "{}")
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return Response({"error": "invalid_payload"}, status=status.HTTP_400_BAD_REQUEST)
+
+        event_id = webhook_event_id(payload, raw_body)
+        event_type = payload.get("event", "")
+        event, created = BillingWebhookEvent.objects.get_or_create(
+            event_id=event_id,
+            defaults={
+                "event_type": event_type,
+                "signature": signature,
+                "payload": payload,
+                "status": BillingWebhookEvent.Status.RECEIVED,
+            },
+        )
+        if not created:
+            return Response({"success": True, "duplicate": True, "event_id": event_id}, status=status.HTTP_200_OK)
+
+        event.event_type = event_type
+        event.signature = signature
+        event.payload = payload
+        event.save(update_fields=["event_type", "signature", "payload", "updated_at"])
+
+        try:
+            process_razorpay_event(event)
+        except Exception as exc:  # pragma: no cover - defensive catch for webhook resiliency
+            event.status = BillingWebhookEvent.Status.FAILED
+            event.failure_reason = str(exc)
+            event.processed_at = timezone.now()
+            event.save(update_fields=["status", "failure_reason", "processed_at", "updated_at"])
+            return Response({"error": "webhook_processing_failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({"success": True, "event_id": event_id, "status": event.status}, status=status.HTTP_200_OK)

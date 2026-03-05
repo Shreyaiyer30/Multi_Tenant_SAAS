@@ -13,7 +13,7 @@ const progressByStatus = {
   done: 100
 };
 
-export default function TaskModal({ task, open, onOpenChange, onUpdated }) {
+export default function TaskModal({ task, open, onOpenChange, onUpdated, onDeleted }) {
   const [form, setForm] = useState(task || {});
   const [comments, setComments] = useState([]);
   const [activity, setActivity] = useState([]);
@@ -61,6 +61,19 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated }) {
       setComment("");
     } catch {
       toast.error("Failed to post comment");
+    }
+  };
+
+  const deleteTask = async () => {
+    if (!task?.id) return;
+    if (!window.confirm("Delete this task? This action cannot be undone.")) return;
+    try {
+      await api.delete(`tasks/${task.id}/`);
+      toast.success("Task deleted");
+      onDeleted?.(task.id);
+      onOpenChange(false);
+    } catch {
+      toast.error("Failed to delete task");
     }
   };
 
@@ -135,12 +148,24 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated }) {
               <label className="text-xs font-medium text-muted-foreground">Progress (%) - Managed by status</label>
               <Input type="number" value={progressByStatus[form.status] ?? form.progress_percent ?? 0} disabled className="bg-muted" />
             </div>
-            <Button onClick={saveTask}>Save Changes</Button>
+            <div className="flex gap-2">
+              <Button onClick={saveTask}>Save Changes</Button>
+              <Button variant="destructive" onClick={deleteTask}>Delete Task</Button>
+            </div>
           </TabsContent>
 
           <TabsContent value="comments" className="space-y-3 pt-3">
             <div className="max-h-56 space-y-2 overflow-auto rounded-md border p-3">
-              {comments.length ? comments.map((c) => <p key={c.id} className="text-sm">{c.body}</p>) : <p className="text-sm text-muted-foreground">No comments yet.</p>}
+              {comments.length ? comments.map((c) => (
+                <div key={c.id} className="rounded-md border border-border/70 p-2">
+                  <div className="mb-1 flex items-center gap-2">
+                    <button type="button" className="rounded-full border border-border/70 bg-muted/50 px-2 py-0.5 text-[11px] font-medium">
+                      {c?.author?.display_name || "Member"}
+                    </button>
+                  </div>
+                  <p className="text-sm">{c.body}</p>
+                </div>
+              )) : <p className="text-sm text-muted-foreground">No comments yet.</p>}
             </div>
             <Input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Add a comment" />
             <Button onClick={postComment}>Post Comment</Button>

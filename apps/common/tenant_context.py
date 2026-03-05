@@ -1,6 +1,9 @@
 import logging
 
-from apps.tenants.models import Membership, Tenant
+from django.http import Http404
+from rest_framework.exceptions import PermissionDenied
+
+from apps.tenants.services import get_active_workspace
 
 logger = logging.getLogger(__name__)
 
@@ -29,27 +32,15 @@ def resolve_tenant_context(request):
         request._tenant_context_resolved = True
         return True
 
-    tenant_slug = request.headers.get("X-Tenant")
     user = getattr(request, "user", None)
     user_id = getattr(user, "id", None)
     user_email = getattr(user, "email", None)
-
-    if not tenant_slug:
-        request.tenant_resolution_error = "missing_tenant_header"
-        request._tenant_context_resolved = False
-        logger.debug(
-            "tenant_context_failed reason=%s user_id=%s email=%s x_tenant=%s",
-            request.tenant_resolution_error,
-            user_id,
-            user_email,
-            tenant_slug,
-        )
-        return False
+    tenant_slug = request.headers.get("X-Tenant")
 
     try:
-        tenant = Tenant.objects.get(slug=tenant_slug)
-    except Tenant.DoesNotExist:
-        request.tenant_resolution_error = "tenant_not_found"
+        get_active_workspace(request)
+    except Http404 as exc:
+        request.tenant_resolution_error = str(exc) or "tenant_not_found"
         request._tenant_context_resolved = False
         logger.debug(
             "tenant_context_failed reason=%s user_id=%s email=%s x_tenant=%s",
@@ -59,20 +50,7 @@ def resolve_tenant_context(request):
             tenant_slug,
         )
         return False
-
-    if not tenant.is_active:
-        request.tenant_resolution_error = "tenant_inactive"
-        request._tenant_context_resolved = False
-        logger.debug(
-            "tenant_context_failed reason=%s user_id=%s email=%s x_tenant=%s",
-            request.tenant_resolution_error,
-            user_id,
-            user_email,
-            tenant_slug,
-        )
-        return False
-
-    if not user or not user.is_authenticated:
+    except PermissionDenied:
         request.tenant_resolution_error = "tenant_access_denied"
         request._tenant_context_resolved = False
         logger.debug(
@@ -84,25 +62,6 @@ def resolve_tenant_context(request):
         )
         return False
 
-    try:
-        membership = Membership.objects.select_related("tenant", "user").get(
-            tenant=tenant,
-            user=user,
-        )
-    except Membership.DoesNotExist:
-        request.tenant_resolution_error = "tenant_access_denied"
-        request._tenant_context_resolved = False
-        logger.debug(
-            "tenant_context_failed reason=%s user_id=%s email=%s x_tenant=%s",
-            request.tenant_resolution_error,
-            user_id,
-            user_email,
-            tenant_slug,
-        )
-        return False
-
-    request.tenant = tenant
-    request.membership = membership
     request.tenant_resolution_error = None
     request._tenant_context_resolved = True
 
@@ -111,6 +70,6 @@ def resolve_tenant_context(request):
         getattr(user, "id", None),
         getattr(user, "email", None),
         tenant_slug,
-        membership.role,
+        request.membership.role,
     )
     return True

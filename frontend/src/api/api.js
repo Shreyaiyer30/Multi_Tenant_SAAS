@@ -21,8 +21,13 @@ const api = axios.create({
   }
 });
 
-let getToken = () => localStorage.getItem("access_token");
-let getTenant = () => localStorage.getItem("tenant_slug");
+const ACCESS_TOKEN_KEY = "accessToken";
+const ACCESS_TOKEN_LEGACY_KEY = "access_token";
+const ACTIVE_TENANT_KEY = "activeTenant";
+const ACTIVE_TENANT_LEGACY_KEY = "tenant_slug";
+
+let getToken = () => localStorage.getItem(ACCESS_TOKEN_KEY) || localStorage.getItem(ACCESS_TOKEN_LEGACY_KEY);
+let getTenant = () => localStorage.getItem(ACTIVE_TENANT_KEY) || localStorage.getItem(ACTIVE_TENANT_LEGACY_KEY);
 let onUnauthorized = null;
 
 const EXCLUDED_TENANT_PREFIXES = ["auth/", "schema/", "docs/", "health/"];
@@ -39,7 +44,8 @@ const resolveTenant = () => {
     const fallback = Array.isArray(workspaces) ? workspaces[0]?.slug : "";
 
     if (fallback) {
-      localStorage.setItem("tenant_slug", fallback);
+      localStorage.setItem(ACTIVE_TENANT_KEY, fallback);
+      localStorage.setItem(ACTIVE_TENANT_LEGACY_KEY, fallback);
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("tenant-changed"));
       }

@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 
 from django.db import transaction
-from django.utils import timezone
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import ValidationError
 
+from apps.audit.models import AuditLog
+from apps.audit.services import log_event
+from apps.notifications.services import notify_assignee, notify_workspace_members
 from apps.projects.models import ProjectMember
 from apps.projects.services import ProjectService
 from apps.tasks.models import Notification, Task, TaskActivity
@@ -145,10 +147,40 @@ class TaskService:
                 old_values=old_values,
                 new_values=new_values,
             )
+            log_event(
+                request.tenant,
+                actor,
+                AuditLog.Action.TASK_UPDATED,
+                entity=task,
+                metadata={
+                    "task_id": str(task.id),
+                    "task_title": task.title,
+                    "changed_fields": changed,
+                },
+            )
+            notify_workspace_members(
+                request.tenant,
+                n_type="task_updated",
+                message=f"Task '{task.title}' was updated.",
+                payload={"task_id": str(task.id), "project_id": str(task.project_id)},
+                actor=actor,
+                excluding_user=actor,
+            )
 
             old_assignee = old.get("assignee")
             if "assignee" in changed:
                 if old_assignee and old_assignee != task.assignee:
+                    log_event(
+                        request.tenant,
+                        actor,
+                        AuditLog.Action.TASK_UNASSIGNED,
+                        entity=task,
+                        metadata={
+                            "task_id": str(task.id),
+                            "task_title": task.title,
+                            "assignee_id": str(old_assignee.id),
+                        },
+                    )
                     NotificationService.enqueue(
                         tenant=request.tenant,
                         recipient=old_assignee,
@@ -158,7 +190,26 @@ class TaskService:
                         body=f"You were unassigned from '{task.title}'.",
                         payload={"task_id": str(task.id)},
                     )
+                    notify_assignee(
+                        request.tenant,
+                        old_assignee,
+                        n_type="task_unassigned",
+                        message=f"You were unassigned from '{task.title}'.",
+                        payload={"task_id": str(task.id), "project_id": str(task.project_id)},
+                        actor=actor,
+                    )
                 if task.assignee and old_assignee != task.assignee:
+                    log_event(
+                        request.tenant,
+                        actor,
+                        AuditLog.Action.TASK_ASSIGNED,
+                        entity=task,
+                        metadata={
+                            "task_id": str(task.id),
+                            "task_title": task.title,
+                            "assignee_id": str(task.assignee.id),
+                        },
+                    )
                     NotificationService.enqueue(
                         tenant=request.tenant,
                         recipient=task.assignee,
@@ -168,6 +219,36 @@ class TaskService:
                         body=f"You were assigned '{task.title}'.",
                         payload={"task_id": str(task.id)},
                     )
+                    notify_assignee(
+                        request.tenant,
+                        task.assignee,
+                        n_type="task_assigned",
+                        message=f"You were assigned '{task.title}'.",
+                        payload={"task_id": str(task.id), "project_id": str(task.project_id)},
+                        actor=actor,
+                    )
+
+            if "status" in changed:
+                log_event(
+                    request.tenant,
+                    actor,
+                    AuditLog.Action.TASK_STATUS_CHANGED,
+                    entity=task,
+                    metadata={
+                        "task_id": str(task.id),
+                        "task_title": task.title,
+                        "old_status": old_values.get("status"),
+                        "new_status": new_values.get("status"),
+                    },
+                )
+                notify_assignee(
+                    request.tenant,
+                    task.assignee,
+                    n_type="task_status_changed",
+                    message=f"Status changed for '{task.title}' to '{task.status}'.",
+                    payload={"task_id": str(task.id), "project_id": str(task.project_id), "status": task.status},
+                    actor=actor,
+                )
 
             if "status" in changed and task.status == Task.Status.DONE:
                 for pm in ProjectMember.objects.filter(project=task.project, tenant=request.tenant).select_related("user"):
@@ -206,6 +287,64 @@ class TaskService:
             old_values={},
             new_values={"status": task.status, "assignee": str(task.assignee_id) if task.assignee_id else None},
         )
+        log_event(
+            request.tenant,
+            actor,
+            AuditLog.Action.TASK_CREATED,
+            entity=task,
+            metadata={"task_id": str(task.id), "task_title": task.title, "status": task.status},
+        )
+        notify_workspace_members(
+            request.tenant,
+            n_type="task_created",
+            message=f"Task '{task.title}' was created.",
+            payload={"task_id": str(task.id), "project_id": str(task.project_id)},
+            actor=actor,
+            excluding_user=actor,
+        )
+        notify_assignee(
+            request.tenant,
+            task.assignee,
+            n_type="task_assigned",
+            message=f"You were assigned '{task.title}'.",
+            payload={"task_id": str(task.id), "project_id": str(task.project_id)},
+            actor=actor,
+        )
         ProjectService.recompute_completion(task.project)
         return task
 
+    @staticmethod
+    @transaction.atomic
+    def delete_task(*, request, task: Task, actor):
+        task_id = str(task.id)
+        task_title = task.title
+        project_id = str(task.project_id)
+        task_assignee = task.assignee
+
+        log_event(
+            request.tenant,
+            actor,
+            AuditLog.Action.TASK_DELETED,
+            entity=task,
+            metadata={"task_id": task_id, "task_title": task_title},
+        )
+        notify_workspace_members(
+            request.tenant,
+            n_type="task_deleted",
+            message=f"Task '{task_title}' was deleted.",
+            payload={"task_id": task_id, "project_id": project_id},
+            actor=actor,
+            excluding_user=actor,
+        )
+        notify_assignee(
+            request.tenant,
+            task_assignee,
+            n_type="task_unassigned",
+            message=f"Task '{task_title}' was deleted.",
+            payload={"task_id": task_id, "project_id": project_id},
+            actor=actor,
+        )
+
+        project = task.project
+        task.delete()
+        ProjectService.recompute_completion(project)

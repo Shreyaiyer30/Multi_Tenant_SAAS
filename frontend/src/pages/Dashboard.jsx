@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Activity,
   CheckCircle2,
@@ -28,62 +29,108 @@ function SkeletonDashboard() {
 
 export default function Dashboard() {
   const [overview, setOverview] = useState(null);
-  const [charts, setCharts] = useState(null);
+  const [recentItems, setRecentItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const { tenant } = useTenant();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!tenant) return;
 
+    const toOverviewShape = (data) => {
+      if (data?.projects) return data;
+      const legacyStatus = data?.tasks_by_status || {};
+      const legacyPriority = data?.tasks_by_priority || {};
+      const totalProjects = data?.overview?.total_projects ?? data?.total_projects ?? 0;
+      return {
+        projects: {
+          total: totalProjects,
+          by_status: legacyStatus,
+          by_priority: legacyPriority
+        }
+      };
+    };
+    const normalizeRecent = (items) =>
+      (items || []).map((item) => ({
+        actor: {
+          id: item?.actor?.id || null,
+          name: item?.actor?.name || item?.actor?.display_name || "System"
+        },
+        action: item?.action || item?.event_type || "TASK_UPDATED",
+        task: item?.task || { id: item?.task_id || null, title: item?.title || "Task" },
+        project: item?.project || null,
+        comment: item?.comment || null,
+        created_at: item?.created_at
+      }));
+
     setLoading(true);
-    Promise.all([api.get("workspace/dashboard/summary/"), api.get("workspace/dashboard/charts/")])
-      .then(([summaryRes, chartsRes]) => {
-        setOverview(summaryRes.data || {});
-        setCharts(chartsRes.data || {});
+    Promise.all([api.get("dashboard/overview/"), api.get("dashboard/recent-activity/?limit=5")])
+      .then(([overviewRes, recentRes]) => {
+        setOverview(toOverviewShape(overviewRes.data || {}));
+        setRecentItems(normalizeRecent(recentRes.data || []));
         setError("");
       })
-      .catch(() => {
-        setOverview(null);
-        setCharts(null);
-        setError("Unable to load dashboard.");
+      .catch(async () => {
+        try {
+          const [summaryRes, workspaceRes] = await Promise.all([
+            api.get("workspace/dashboard/summary/"),
+            api.get("workspace/dashboard/")
+          ]);
+          const legacyOverview = toOverviewShape({
+            total_projects: summaryRes.data?.total_projects ?? 0,
+            tasks_by_status: workspaceRes.data?.tasks_by_status || {},
+            tasks_by_priority: workspaceRes.data?.tasks_by_priority || {}
+          });
+          setOverview(legacyOverview);
+          setRecentItems(normalizeRecent(workspaceRes.data?.recent_activity || []));
+          setError("");
+        } catch {
+          setOverview(null);
+          setRecentItems([]);
+          setError("Unable to load dashboard.");
+        }
       })
       .finally(() => setLoading(false));
   }, [tenant]);
 
-  const statusBreakdown = charts?.tasks_by_status || {};
-  const priorityBreakdown = charts?.tasks_by_priority || {};
-  const overviewData = overview || {};
-  const recentItems = charts?.recent_activity || [];
+  const statusBreakdown = overview?.projects?.by_status || {};
+  const priorityBreakdown = overview?.projects?.by_priority || {};
+  const projectTotal = overview?.projects?.total ?? 0;
+  const totalTasks = Object.values(statusBreakdown).reduce((sum, value) => sum + Number(value || 0), 0);
+  const completedTasks = Number(statusBreakdown?.done || 0);
+  const completionRate = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const tiles = useMemo(
     () => [
       {
         label: "Projects",
-        value: overviewData.total_projects ?? 0,
+        value: projectTotal,
         icon: FolderKanban,
-        hint: "Active workspace projects"
+        hint: "Active workspace projects",
+        href: "/projects"
       },
       {
         label: "Total Tasks",
-        value: overviewData.total_tasks ?? 0,
+        value: totalTasks,
         icon: ListChecks,
-        hint: "Across all statuses"
+        hint: "Across all statuses",
+        href: "/tasks"
       },
       {
         label: "Completed",
-        value: overviewData.completed_tasks ?? 0,
+        value: completedTasks,
         icon: CheckCircle2,
         hint: "Delivered tasks"
       },
       {
         label: "Completion Rate",
-        value: `${overviewData.completion_rate ?? 0}%`,
+        value: `${completionRate}%`,
         icon: Percent,
         hint: "Workspace velocity"
       }
     ],
-    [overviewData]
+    [projectTotal, totalTasks, completedTasks, completionRate]
   );
 
   const statusData = Object.entries(statusBreakdown).map(([name, value]) => ({ name, value }));
@@ -107,7 +154,11 @@ export default function Dashboard() {
             {tiles.map((tile) => {
               const Icon = tile.icon;
               return (
-                <Card key={tile.label} className="elevate-hover overflow-hidden">
+                <Card
+                  key={tile.label}
+                  className={`elevate-hover overflow-hidden ${tile.href ? "cursor-pointer" : ""}`}
+                  onClick={() => tile.href && navigate(tile.href)}
+                >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -214,8 +265,11 @@ export default function Dashboard() {
                   <div className="space-y-3">
                     {recentItems.map((item, idx) => (
                       <div key={item.id || idx} className="rounded-xl border border-border/70 bg-muted/20 p-3">
-                        <p className="text-sm font-medium">{item.title || item.event || "Workspace update"}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{item.subtitle || item.description || "Task activity was recorded."}</p>
+                        <p className="text-sm font-medium">
+                          {item.actor?.name || "Someone"} {String(item.action || "").replaceAll("_", " ").toLowerCase()} {item.task?.title || item.project?.name || "an item"}
+                        </p>
+                        {item.comment ? <p className="mt-1 text-xs text-muted-foreground">{item.comment}</p> : null}
+                        <p className="mt-1 text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString()}</p>
                       </div>
                     ))}
                   </div>
