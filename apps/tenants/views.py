@@ -1,19 +1,16 @@
-import json
-
 from django.db.models import Count
 from django.http import Http404
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.conf import settings
-from rest_framework.permissions import AllowAny
 
 from apps.common.permissions import IsTenantAdminOrOwner, IsTenantMember, IsTenantOwner, PlanLimitPermission
 from apps.tasks.models import ActivityEvent, Task
-from apps.tenants.models import BillingWebhookEvent, Membership, SubscriptionPlan, WorkspaceInvite, WorkspaceSubscription
-from apps.tenants.services import process_razorpay_event, verify_razorpay_webhook_signature, webhook_event_id
+from apps.tenants.models import Membership, SubscriptionPlan, WorkspaceInvite, WorkspaceSubscription
 from apps.tenants.serializers import (
     InviteAcceptSerializer,
     InviteTokenPreviewSerializer,
@@ -380,50 +377,3 @@ class BillingVerifyPaymentAPIView(APIView):
                 "subscription": WorkspaceSubscriptionSerializer(subscription).data,
             }
         )
-
-
-class BillingWebhookAPIView(APIView):
-    permission_classes = [AllowAny]
-    authentication_classes = []
-
-    def post(self, request):
-        signature = request.headers.get("X-Razorpay-Signature", "")
-        raw_body = request.body
-
-        if not verify_razorpay_webhook_signature(raw_body, signature):
-            return Response({"error": "invalid_signature"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            payload = json.loads(raw_body.decode("utf-8") or "{}")
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            return Response({"error": "invalid_payload"}, status=status.HTTP_400_BAD_REQUEST)
-
-        event_id = webhook_event_id(payload, raw_body)
-        event_type = payload.get("event", "")
-        event, created = BillingWebhookEvent.objects.get_or_create(
-            event_id=event_id,
-            defaults={
-                "event_type": event_type,
-                "signature": signature,
-                "payload": payload,
-                "status": BillingWebhookEvent.Status.RECEIVED,
-            },
-        )
-        if not created:
-            return Response({"success": True, "duplicate": True, "event_id": event_id}, status=status.HTTP_200_OK)
-
-        event.event_type = event_type
-        event.signature = signature
-        event.payload = payload
-        event.save(update_fields=["event_type", "signature", "payload", "updated_at"])
-
-        try:
-            process_razorpay_event(event)
-        except Exception as exc:  # pragma: no cover - defensive catch for webhook resiliency
-            event.status = BillingWebhookEvent.Status.FAILED
-            event.failure_reason = str(exc)
-            event.processed_at = timezone.now()
-            event.save(update_fields=["status", "failure_reason", "processed_at", "updated_at"])
-            return Response({"error": "webhook_processing_failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        return Response({"success": True, "event_id": event_id, "status": event.status}, status=status.HTTP_200_OK)

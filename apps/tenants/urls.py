@@ -3,7 +3,6 @@ from django.urls import path
 from apps.tenants.views import (
     BillingCreateOrderAPIView,
     BillingPlansAPIView,
-    BillingWebhookAPIView,
     BillingVerifyPaymentAPIView,
     MembershipDetailAPIView,
     MembershipListCreateAPIView,
@@ -29,5 +28,4 @@ urlpatterns = [
     path("billing/plans/", BillingPlansAPIView.as_view(), name="billing-plans"),
     path("billing/create-order/", BillingCreateOrderAPIView.as_view(), name="billing-create-order"),
     path("billing/verify-payment/", BillingVerifyPaymentAPIView.as_view(), name="billing-verify-payment"),
-    path("billing/webhook/", BillingWebhookAPIView.as_view(), name="billing-webhook"),
 ]
