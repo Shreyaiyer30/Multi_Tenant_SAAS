@@ -23,3 +23,9 @@ staticfiles/
 # Frontend
 frontend/node_modules
 frontend/dist
+# React env
+frontend/.env
+
+# # Django static/media
+# staticfiles/
+# media/
