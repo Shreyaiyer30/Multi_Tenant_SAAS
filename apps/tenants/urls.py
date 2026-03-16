@@ -1,7 +1,6 @@
 from django.urls import path
 
 from apps.tenants.views import (
-    BillingCreateOrderAPIView,
     BillingPlansAPIView,
     BillingVerifyPaymentAPIView,
     MembershipDetailAPIView,
@@ -26,6 +25,5 @@ urlpatterns = [
     path("invites/accept/", WorkspaceInviteAcceptAPIView.as_view(), name="workspace-invite-accept"),
     path("invites/preview/<str:token>/", WorkspaceInvitePreviewAPIView.as_view(), name="workspace-invite-preview"),
     path("billing/plans/", BillingPlansAPIView.as_view(), name="billing-plans"),
-    path("billing/create-order/", BillingCreateOrderAPIView.as_view(), name="billing-create-order"),
     path("billing/verify-payment/", BillingVerifyPaymentAPIView.as_view(), name="billing-verify-payment"),
 ]

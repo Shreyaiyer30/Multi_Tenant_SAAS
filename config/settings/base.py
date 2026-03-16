@@ -134,6 +134,7 @@ INSTALLED_APPS = [
     "apps.common",
     "apps.accounts",
     "apps.tenants",
+    "apps.billing",
     "apps.projects",
     "apps.tasks",
     "apps.audit",

@@ -1,7 +1,7 @@
 import axios from "axios";
 import { toast } from "sonner";
 
-const DEFAULT_API_BASE_URL = "https://multi-tenant-saas-production.up.railway.app/api/v1/";
+const DEFAULT_API_BASE_URL = "https://multitenantsaas-production.up.railway.app/api/v1/";
 
 const ACCESS_TOKEN_KEY = "accessToken";
 const ACCESS_TOKEN_LEGACY_KEY = "access_token";

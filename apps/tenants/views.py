@@ -2,12 +2,12 @@ from django.db.models import Count
 from django.http import Http404
 from django.utils import timezone
 from rest_framework import permissions, status
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.conf import settings
 
+from apps.billing.services import ensure_default_plans, get_razorpay_client
 from apps.common.permissions import IsTenantAdminOrOwner, IsTenantMember, IsTenantOwner, PlanLimitPermission
 from apps.tasks.models import ActivityEvent, Task
 from apps.tenants.models import Membership, SubscriptionPlan, WorkspaceInvite, WorkspaceSubscription
@@ -218,42 +218,11 @@ class WorkspaceDashboardChartsAPIView(APIView):
         return Response({"tasks_by_status": payload["tasks_by_status"], "tasks_by_priority": payload["tasks_by_priority"]})
 
 
-def _ensure_default_plans():
-    defaults = [
-        {
-            "name": "Free",
-            "code": SubscriptionPlan.Code.FREE,
-            "price": 0,
-            "max_projects": 5,
-            "max_users": 3,
-        },
-        {
-            "name": "Pro",
-            "code": SubscriptionPlan.Code.PRO,
-            "price": 59900,
-            "max_projects": 50,
-            "max_users": 50,
-        },
-        {
-            "name": "Enterprise",
-            "code": SubscriptionPlan.Code.ENTERPRISE,
-            "price": 99900,
-            "max_projects": 100,
-            "max_users": 500,
-        },
-    ]
-    for item in defaults:
-        SubscriptionPlan.objects.update_or_create(
-            name=item["name"],
-            defaults=item,
-        )
-
-
 class BillingPlansAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsTenantMember]
 
     def get(self, request):
-        _ensure_default_plans()
+        ensure_default_plans()
         plans = SubscriptionPlan.objects.filter(is_active=True).order_by("price", "name")
         subscription = WorkspaceSubscription.objects.filter(workspace=request.tenant).select_related("plan").first()
         return Response(
@@ -271,60 +240,10 @@ class BillingPlansAPIView(APIView):
         )
 
 
-class BillingCreateOrderAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsTenantMember, IsTenantOwner]
-
-    def post(self, request):
-        import razorpay
-
-        plan_id = request.data.get("plan_id")
-        if not plan_id:
-            return Response({"error": "validation_error", "detail": {"plan_id": ["This field is required."]}}, status=status.HTTP_400_BAD_REQUEST)
-
-        plan = SubscriptionPlan.objects.filter(id=plan_id, is_active=True).first()
-        if not plan:
-            return Response({"error": "not_found", "detail": {"plan_id": ["Plan not found."]}}, status=status.HTTP_404_NOT_FOUND)
-
-        key_id = getattr(settings, "RAZORPAY_KEY_ID", "")
-        key_secret = getattr(settings, "RAZORPAY_KEY_SECRET", "")
-        if not key_id or not key_secret:
-            return Response({"error": "configuration_error", "detail": {"detail": "Razorpay is not configured."}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        client = razorpay.Client(auth=(key_id, key_secret))
-        order = client.order.create(
-            {
-                "amount": int(plan.price),
-                "currency": "INR",
-                "payment_capture": 1,
-                "notes": {
-                    "workspace_id": str(request.tenant.id),
-                    "workspace_slug": request.tenant.slug,
-                    "plan_id": str(plan.id),
-                },
-            }
-        )
-
-        subscription, _ = WorkspaceSubscription.objects.get_or_create(workspace=request.tenant)
-        subscription.plan = plan
-        subscription.razorpay_order_id = order.get("id", "")
-        subscription.is_active = False
-        subscription.save(update_fields=["plan", "razorpay_order_id", "is_active", "updated_at"])
-
-        return Response(
-            {
-                "order_id": order.get("id"),
-                "key": key_id,
-                "amount": int(plan.price),
-                "currency": "INR",
-            }
-        )
-
-
 class BillingVerifyPaymentAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsTenantMember, IsTenantOwner]
 
     def post(self, request):
-        import razorpay
 
         order_id = request.data.get("razorpay_order_id")
         payment_id = request.data.get("razorpay_payment_id")
@@ -340,16 +259,21 @@ class BillingVerifyPaymentAPIView(APIView):
         if missing:
             return Response({"error": "validation_error", "detail": missing}, status=status.HTTP_400_BAD_REQUEST)
 
-        key_id = getattr(settings, "RAZORPAY_KEY_ID", "")
-        key_secret = getattr(settings, "RAZORPAY_KEY_SECRET", "")
-        if not key_id or not key_secret:
-            return Response({"error": "configuration_error", "detail": {"detail": "Razorpay is not configured."}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        try:
+            client, _ = get_razorpay_client()
+        except ValidationError as exc:
+            detail = exc.detail if hasattr(exc, "detail") else {"detail": str(exc)}
+            if not isinstance(detail, dict):
+                detail = {"detail": detail}
+            return Response(
+                {"error": "configuration_error", "detail": {"detail": detail.get("detail", detail)}},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         subscription = WorkspaceSubscription.objects.filter(workspace=request.tenant, razorpay_order_id=order_id).select_related("plan").first()
         if not subscription or not subscription.plan:
             return Response({"error": "not_found", "detail": {"detail": "Subscription order not found for workspace."}}, status=status.HTTP_404_NOT_FOUND)
 
-        client = razorpay.Client(auth=(key_id, key_secret))
         try:
             client.utility.verify_payment_signature(
                 {
@@ -358,8 +282,13 @@ class BillingVerifyPaymentAPIView(APIView):
                     "razorpay_signature": signature,
                 }
             )
-        except razorpay.errors.SignatureVerificationError:
-            return Response({"error": "validation_error", "detail": {"detail": "Invalid payment signature."}}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            if exc.__class__.__name__ == "SignatureVerificationError":
+                return Response({"error": "validation_error", "detail": {"detail": "Invalid payment signature."}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "server_error", "detail": {"detail": str(exc)}},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         plan = subscription.plan
         subscription.razorpay_payment_id = payment_id
