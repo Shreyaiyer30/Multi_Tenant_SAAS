@@ -13,9 +13,11 @@ def get_active_workspace(request):
     if not user or not user.is_authenticated:
         raise PermissionDenied("tenant_access_denied")
 
-    tenant = Tenant.objects.filter(slug=tenant_slug, is_active=True).first()
+    tenant = Tenant.objects.filter(slug=tenant_slug).first()
     if tenant is None:
         raise Http404("tenant_not_found")
+    if not tenant.is_active:
+        raise Http404("tenant_inactive")
 
     membership = Membership.objects.select_related("tenant", "user").filter(tenant=tenant, user=user).first()
     if membership is None:

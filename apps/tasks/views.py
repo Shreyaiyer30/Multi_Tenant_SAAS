@@ -8,8 +8,8 @@ from rest_framework.views import APIView
 
 from apps.common.mixins import TenantScopedQuerysetMixin
 from apps.common.permissions import IsResourceOwnerOrTenantAdmin, IsTenantAdminOrOwner, IsTenantMember
-from apps.tasks.models import ActivityEvent, Comment, Notification, Task, TaskActivity
-from apps.tasks.serializers import ActivitySerializer, CommentSerializer, NotificationSerializer, TaskSerializer
+from apps.tasks.models import Comment, Notification, Task, TaskActivity
+from apps.tasks.serializers import CommentSerializer, NotificationSerializer, TaskSerializer
 from apps.tasks.services import TaskService
 
 
@@ -57,7 +57,7 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         if qp.get("due_date_after"):
             queryset = queryset.filter(due_date__gte=qp["due_date_after"])
         if qp.get("overdue") == "true":
-            queryset = queryset.filter(due_date__lt=__import__("django.utils.timezone").utils.timezone.localdate()).exclude(status=Task.Status.DONE)
+            queryset = queryset.filter(due_date__lt=timezone.localdate()).exclude(status=Task.Status.DONE)
         completed = qp.get("completed")
         if completed in {"true", "false"}:
             queryset = queryset.filter(status=Task.Status.DONE) if completed == "true" else queryset.exclude(status=Task.Status.DONE)
@@ -228,6 +228,11 @@ class NotificationMarkAPIView(APIView):
             target = queryset
         else:
             ids = request.data.get("ids", [])
+            if not isinstance(ids, list):
+                return Response(
+                    {"error": "validation_error", "detail": {"ids": ["This field must be a list."]}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             target = queryset.filter(id__in=ids)
 
         if mode == "read":
@@ -241,7 +246,13 @@ class NotificationDetailAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsTenantMember]
 
     def patch(self, request, notification_id):
-        read = bool(request.data.get("read", True))
+        raw_read = request.data.get("read", True)
+        if isinstance(raw_read, bool):
+            read = raw_read
+        elif isinstance(raw_read, str):
+            read = raw_read.strip().lower() in {"true", "1", "yes"}
+        else:
+            read = bool(raw_read)
         row = Notification.objects.filter(id=notification_id, recipient=request.user, tenant=request.tenant).first()
         if not row:
             return Response({"error": "not_found"}, status=status.HTTP_404_NOT_FOUND)

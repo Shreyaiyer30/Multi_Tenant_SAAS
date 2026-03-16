@@ -1,25 +1,7 @@
-# import os
-
-# import dj_database_url
-
-# from .base import *
-
-# DEBUG = False
-
-# DATABASES = {
-#     "default": dj_database_url.config(default=os.environ.get("DATABASE_URL"))
-# }
-
-# SECURE_SSL_REDIRECT = True
-# SESSION_COOKIE_SECURE = True
-# CSRF_COOKIE_SECURE = True
-# SECURE_HSTS_SECONDS = 31536000
-# SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-# SECURE_HSTS_PRELOAD = True
-# X_FRAME_OPTIONS = "DENY"
 import os
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 from .base import *
 
@@ -51,3 +33,44 @@ if database_url:
             ssl_require=True,
         )
     }
+else:
+    pg_host = os.getenv("PGHOST", "").strip()
+    pg_name = os.getenv("PGDATABASE", "").strip()
+    if pg_host and pg_name:
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": pg_name,
+                "USER": os.getenv("PGUSER", ""),
+                "PASSWORD": os.getenv("PGPASSWORD", ""),
+                "HOST": pg_host,
+                "PORT": os.getenv("PGPORT", "5432"),
+                "CONN_MAX_AGE": 600,
+            }
+        }
+    else:
+        db_name = os.getenv("DB_NAME", "").strip()
+        db_host = os.getenv("DB_HOST", "").strip()
+        if db_name and db_host:
+            if db_host in {"127.0.0.1", "localhost", "::1"}:
+                raise ImproperlyConfigured(
+                    "Invalid production database host: localhost/127.0.0.1. "
+                    "Set DATABASE_URL or a reachable external DB host."
+                )
+            DATABASES = {
+                "default": {
+                    "ENGINE": "django.db.backends.postgresql",
+                    "NAME": db_name,
+                    "USER": os.getenv("DB_USER", ""),
+                    "PASSWORD": os.getenv("DB_PASSWORD", ""),
+                    "HOST": db_host,
+                    "PORT": os.getenv("DB_PORT", "5432"),
+                    "CONN_MAX_AGE": 600,
+                    "OPTIONS": {"sslmode": "require"},
+                }
+            }
+        else:
+            raise ImproperlyConfigured(
+                "Database configuration missing for production. Set DATABASE_URL, "
+                "PGHOST/PGDATABASE, or DB_HOST/DB_NAME."
+            )

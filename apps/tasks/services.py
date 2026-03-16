@@ -8,7 +8,8 @@ from apps.audit.services import log_event
 from apps.notifications.services import notify_assignee, notify_workspace_members
 from apps.projects.models import ProjectMember
 from apps.projects.services import ProjectService
-from apps.tasks.models import Notification, Task, TaskActivity
+from apps.tasks.models import Notification as TaskNotification
+from apps.tasks.models import Task, TaskActivity
 from apps.tenants.models import Membership
 
 
@@ -23,7 +24,7 @@ class NotificationService:
     def enqueue(*, tenant, recipient, actor, n_type, task=None, body="", payload=None):
         if not recipient:
             return None
-        return Notification.objects.create(
+        return TaskNotification.objects.create(
             tenant=tenant,
             recipient=recipient,
             actor=actor,

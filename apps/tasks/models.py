@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -75,7 +77,7 @@ class ActivityEvent(UUIDModel):
         COMMENT_ADDED = "comment_added", "Comment Added"
         COMMENT_DELETED = "comment_deleted", "Comment Deleted"
 
-    id = models.UUIDField(primary_key=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey("tenants.Tenant", on_delete=models.CASCADE, related_name="activity_events")
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="activity")
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="activity_events")

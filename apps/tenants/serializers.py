@@ -6,7 +6,6 @@ from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework import serializers
 
-from apps.tasks.models import ActivityEvent, Task
 from apps.tenants.models import BillingWebhookEvent, Membership, SubscriptionPlan, Tenant, WorkspaceInvite, WorkspaceSubscription
 
 User = get_user_model()
@@ -25,7 +24,7 @@ class TenantCreateSerializer(serializers.Serializer):
     @transaction.atomic
     def create(self, validated_data):
         name = validated_data["name"]
-        base_slug = slugify(name)
+        base_slug = slugify(name) or "workspace"
         slug = base_slug
         counter = 1
         while Tenant.objects.filter(slug=slug).exists():

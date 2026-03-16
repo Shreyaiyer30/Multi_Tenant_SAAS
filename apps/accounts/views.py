@@ -1,6 +1,5 @@
 import logging
 
-from django.db.models import F
 from django.conf import settings
 from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
 from rest_framework import status
@@ -21,6 +20,25 @@ from apps.accounts.serializers import (
 from apps.tenants.models import Membership
 
 logger = logging.getLogger(__name__)
+
+
+def _workspace_payload(membership):
+    return {
+        "id": membership.tenant.id,
+        "name": membership.tenant.name,
+        "slug": membership.tenant.slug,
+        "plan": membership.tenant.plan,
+        "role": membership.role,
+    }
+
+
+def _sanitize_register_payload(data):
+    if not isinstance(data, dict):
+        return {"_non_dict_payload": True}
+    sanitized = dict(data)
+    if "password" in sanitized:
+        sanitized["password"] = "***REDACTED***"
+    return sanitized
 
 
 class RegisterAPIView(APIView):
@@ -51,7 +69,7 @@ class RegisterAPIView(APIView):
                 "register_request",
                 extra={
                     "content_type": request.content_type,
-                    "data": request.data,
+                    "data": _sanitize_register_payload(request.data),
                 },
             )
 
@@ -79,16 +97,7 @@ class RegisterAPIView(APIView):
             .order_by("joined_at")
         )
         refresh = RefreshToken.for_user(user)
-        workspaces = [
-            {
-                "id": membership.tenant.id,
-                "name": membership.tenant.name,
-                "slug": membership.tenant.slug,
-                "plan": membership.tenant.plan,
-                "role": membership.role,
-            }
-            for membership in memberships
-        ]
+        workspaces = [_workspace_payload(membership) for membership in memberships]
 
         data = {
             "access": str(refresh.access_token),
@@ -135,16 +144,7 @@ class LoginAPIView(APIView):
             .select_related("tenant")
             .order_by("joined_at")
         )
-        workspaces = [
-            {
-                "id": membership.tenant.id,
-                "name": membership.tenant.name,
-                "slug": membership.tenant.slug,
-                "plan": membership.tenant.plan,
-                "role": membership.role,
-            }
-            for membership in memberships
-        ]
+        workspaces = [_workspace_payload(membership) for membership in memberships]
         return Response(
             {
                 "access": str(refresh.access_token),

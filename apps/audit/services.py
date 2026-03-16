@@ -1,6 +1,4 @@
 from apps.audit.models import AuditLog
-from django.db import DatabaseError
-from django.db.utils import ProgrammingError
 
 
 def log_event(workspace, actor, action, entity=None, metadata=None):
@@ -24,6 +22,6 @@ def log_event(workspace, actor, action, entity=None, metadata=None):
             entity_id=entity_id,
             metadata=metadata,
         )
-    except (ProgrammingError, DatabaseError, Exception):
+    except Exception:
         # Do not fail core task flows if audit storage is temporarily unavailable.
         return None

@@ -1,8 +1,10 @@
 from django.db.models import Count, Q
+from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.audit.models import AuditLog
 from apps.audit.services import log_event
 from apps.common.mixins import TenantScopedQuerysetMixin
 from apps.common.permissions import IsTenantAdminOrOwner, IsTenantMember, IsTenantOwner, PlanLimitPermission
@@ -39,7 +41,7 @@ class ProjectViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         log_event(
             self.request.tenant,
             self.request.user,
-            "PROJECT_CREATED",
+            AuditLog.Action.PROJECT_CREATED,
             entity=serializer.instance,
             metadata={
                 "entity_type": "project",
@@ -54,7 +56,7 @@ class ProjectViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         log_event(
             self.request.tenant,
             self.request.user,
-            "PROJECT_UPDATED",
+            AuditLog.Action.PROJECT_UPDATED,
             entity=project,
             metadata={
                 "entity_type": "project",
@@ -69,7 +71,7 @@ class ProjectViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         log_event(
             self.request.tenant,
             self.request.user,
-            "PROJECT_DELETED",
+            AuditLog.Action.PROJECT_DELETED,
             entity=instance,
             metadata={
                 "entity_type": "project",
@@ -169,7 +171,7 @@ class ProjectViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         log_event(
             request.tenant,
             request.user,
-            "PROJECT_MEMBER_ADDED",
+            AuditLog.Action.PROJECT_MEMBER_ADDED,
             entity=project,
             metadata={
                 "entity_type": "project",
@@ -196,7 +198,7 @@ class ProjectViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         log_event(
             request.tenant,
             request.user,
-            "PROJECT_MEMBER_REMOVED",
+            AuditLog.Action.PROJECT_MEMBER_REMOVED,
             entity=project,
             metadata={
                 "entity_type": "project",
@@ -207,6 +209,6 @@ class ProjectViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         )
         
         # Unassign tasks
-        project.tasks.filter(assignee_id=user_id).update(assignee=None, updated_at=__import__("django.utils.timezone").utils.timezone.now())
+        project.tasks.filter(assignee_id=user_id).update(assignee=None, updated_at=timezone.now())
         
         return Response(status=status.HTTP_204_NO_CONTENT)

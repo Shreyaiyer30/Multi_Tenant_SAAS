@@ -1,24 +1,36 @@
 """Django settings shared across environments."""
 
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
 from corsheaders.defaults import default_headers
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-DATABASES = {
-    "default": dj_database_url.parse(
-        os.environ.get("DATABASE_URL")
-    )
-}
+
 def _build_database_settings():
     database_url = os.getenv("DATABASE_URL", "").strip().strip('"').strip("'")
-    ssl_required = os.getenv("DB_SSL_REQUIRE", "False").lower() == "true"
+    debug_mode = os.getenv("DEBUG", "False").lower() == "true"
+    running_tests = "test" in sys.argv or bool(os.getenv("PYTEST_CURRENT_TEST"))
+    force_postgres_tests = os.getenv("USE_POSTGRES_FOR_TESTS", "False").lower() == "true"
+    ssl_required = os.getenv(
+        "DB_SSL_REQUIRE",
+        "False" if debug_mode else "True",
+    ).lower() == "true"
+
+    # Default to SQLite for tests to keep local/CI runs deterministic when
+    # DATABASE_URL points to an unreachable private database host.
+    if running_tests and not force_postgres_tests:
+        return {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "test_db.sqlite3",
+        }
 
     if database_url:
         return dj_database_url.parse(
@@ -40,27 +52,39 @@ def _build_database_settings():
             "CONN_MAX_AGE": 600,
         }
 
-    # db_name = os.getenv("DB_NAME")
-    # if db_name:
-    #     return {
-    #         "ENGINE": "django.db.backends.postgresql",
-    #         "NAME": db_name,
-    #         "USER": os.getenv("DB_USER", ""),
-    #         "PASSWORD": os.getenv("DB_PASSWORD", ""),
-    #         "HOST": os.getenv("DB_HOST", "127.0.0.1"),
-    #         "PORT": os.getenv("DB_PORT", "5432"),
-    #         "CONN_MAX_AGE": 600,
-    #     }
+    db_name = os.getenv("DB_NAME")
+    db_host = os.getenv("DB_HOST")
+    if db_name:
+        if not db_host and not debug_mode:
+            raise ImproperlyConfigured(
+                "DB_HOST must be set when using DB_NAME in non-debug environments."
+            )
+        return {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": db_name,
+            "USER": os.getenv("DB_USER", ""),
+            "PASSWORD": os.getenv("DB_PASSWORD", ""),
+            "HOST": db_host or "127.0.0.1",
+            "PORT": os.getenv("DB_PORT", "5432"),
+            "CONN_MAX_AGE": 600,
+        }
 
-    # # Last-resort fallback for environments where Postgres isn't configured yet.
-    # return {
-    #     "ENGINE": "django.db.backends.sqlite3",
-    #     "NAME": BASE_DIR / "db.sqlite3",
-    # }
+    if not debug_mode:
+        raise ImproperlyConfigured(
+            "Database configuration missing. Set DATABASE_URL, PGHOST/PGDATABASE, "
+            "or DB_NAME/DB_HOST."
+        )
+
+    # Development-only fallback for environments without a Postgres configuration.
+    return {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }
 
 
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-change-me")
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
@@ -123,6 +147,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 DATABASES = {"default": _build_database_settings()}
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},

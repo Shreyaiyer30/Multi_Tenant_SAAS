@@ -1,19 +1,28 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
-import Login from "@/pages/Login";
-import Register from "@/pages/Register";
-import Dashboard from "@/pages/Dashboard";
-import Projects from "@/pages/Projects";
-import ProjectBoard from "@/pages/ProjectBoard";
-import Tasks from "@/pages/Tasks";
-import Notifications from "@/pages/Notifications";
-import Members from "@/pages/Members";
-import Reports from "@/pages/Reports";
-import Billing from "@/pages/Billing";
 import { useAuth } from "@/context/AuthContext";
+
+const Login = lazy(() => import("@/pages/Login"));
+const Register = lazy(() => import("@/pages/Register"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Projects = lazy(() => import("@/pages/Projects"));
+const ProjectBoard = lazy(() => import("@/pages/ProjectBoard"));
+const Tasks = lazy(() => import("@/pages/Tasks"));
+const Notifications = lazy(() => import("@/pages/Notifications"));
+const Members = lazy(() => import("@/pages/Members"));
+const Reports = lazy(() => import("@/pages/Reports"));
+const Billing = lazy(() => import("@/pages/Billing"));
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-[220px] items-center justify-center">
+      <Loader2 className="h-6 w-6 animate-spin" />
+    </div>
+  );
+}
 
 function ProtectedLayout() {
   const location = useLocation();
@@ -66,21 +75,23 @@ function ProtectedRoute() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
-      <Route element={<ProtectedRoute />}>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/projects" element={<Projects />} />
-        <Route path="/projects/:id/board" element={<ProjectBoard />} />
-        <Route path="/tasks" element={<Tasks />} />
-        <Route path="/notifications" element={<Notifications />} />
-        <Route path="/members" element={<Members />} />
-        <Route path="/billing" element={<Billing />} />
-        <Route path="/reports" element={<Reports />} />
-      </Route>
-    </Routes>
+        <Route element={<ProtectedRoute />}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/projects" element={<Projects />} />
+          <Route path="/projects/:id/board" element={<ProjectBoard />} />
+          <Route path="/tasks" element={<Tasks />} />
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/members" element={<Members />} />
+          <Route path="/billing" element={<Billing />} />
+          <Route path="/reports" element={<Reports />} />
+        </Route>
+      </Routes>
+    </Suspense>
   );
 }

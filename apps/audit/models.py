@@ -6,6 +6,11 @@ from apps.common.models import TimeStampedModel, UUIDModel
 
 class AuditLog(UUIDModel, TimeStampedModel):
     class Action(models.TextChoices):
+        PROJECT_CREATED = "PROJECT_CREATED", "Project Created"
+        PROJECT_UPDATED = "PROJECT_UPDATED", "Project Updated"
+        PROJECT_DELETED = "PROJECT_DELETED", "Project Deleted"
+        PROJECT_MEMBER_ADDED = "PROJECT_MEMBER_ADDED", "Project Member Added"
+        PROJECT_MEMBER_REMOVED = "PROJECT_MEMBER_REMOVED", "Project Member Removed"
         TASK_CREATED = "TASK_CREATED", "Task Created"
         TASK_UPDATED = "TASK_UPDATED", "Task Updated"
         TASK_DELETED = "TASK_DELETED", "Task Deleted"
@@ -33,4 +38,3 @@ class AuditLog(UUIDModel, TimeStampedModel):
             models.Index(fields=["workspace", "action"]),
             models.Index(fields=["workspace", "entity_type", "created_at"]),
         ]
-

@@ -142,7 +142,10 @@ class MembershipDetailAPIView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         # Unassign tasks across all projects in this tenant
-        Task.objects.filter(tenant=request.tenant, assignee=membership.user).update(assignee=None, updated_at=__import__("django.utils.timezone").utils.timezone.now())
+        Task.objects.filter(tenant=request.tenant, assignee=membership.user).update(
+            assignee=None,
+            updated_at=timezone.now(),
+        )
         
         membership.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -156,6 +159,7 @@ class WorkspaceDashboardAPIView(APIView):
         tenant = request.tenant
         tasks = tenant.tasks_task_items.all()
         projects = tenant.projects_project_items.all()
+        today = timezone.localdate()
 
         overview = {
             "total_members": tenant.memberships.count(),
@@ -163,7 +167,7 @@ class WorkspaceDashboardAPIView(APIView):
             "total_tasks": tasks.count(),
             "active_tasks": tasks.exclude(status=Task.Status.DONE).count(),
             "completed_tasks": tasks.filter(status=Task.Status.DONE).count(),
-            "overdue_tasks": tasks.filter(due_date__lt=__import__("django.utils.timezone").utils.timezone.localdate()).exclude(status=Task.Status.DONE).count(),
+            "overdue_tasks": tasks.filter(due_date__lt=today).exclude(status=Task.Status.DONE).count(),
         }
         
         total_tasks = overview["total_tasks"]
