@@ -88,7 +88,13 @@ export function AuthProvider({ children }) {
     setupInterceptors(
       () => accessToken,
       () => getStoredTenant(),
-      logout
+      () => {
+        toast.error("Session expired. Please login again.");
+        logout();
+        if (window.location.pathname !== "/login") {
+          window.location.assign("/login");
+        }
+      }
     );
   }, [accessToken]);
 

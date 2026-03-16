@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, CreditCard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/api/api";
+import { createOrder } from "@/services/billingService";
 import { useTenant } from "@/context/TenantContext";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,6 +63,8 @@ export default function Billing() {
   }, [tenant]);
 
   const handleUpgrade = async (plan) => {
+    if (busyPlanId) return;
+
     if (!isOwner) {
       toast.error("Only workspace owner can upgrade plan");
       return;
@@ -75,7 +78,7 @@ export default function Billing() {
         return;
       }
 
-      const { data } = await api.post("billing/create-order/", { plan_id: plan.id });
+      const data = await createOrder(plan);
 
       const options = {
         key: data.key,
@@ -103,6 +106,15 @@ export default function Billing() {
       const razorpay = new window.Razorpay(options);
       razorpay.open();
     } catch (error) {
+      if (error?.response?.status === 401) {
+        // Global interceptor handles redirect + token cleanup + toast.
+        return;
+      }
+      if (error?.response?.status >= 500) {
+        toast.error("We could not start checkout right now. Please try again shortly.");
+        console.error("Billing create-order failed", error?.response?.data || error);
+        return;
+      }
       const detail = error?.response?.data?.detail?.detail;
       toast.error(detail || "Unable to initiate payment");
     } finally {

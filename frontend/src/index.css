@@ -5,51 +5,51 @@
 @tailwind utilities;
 
 :root {
-  --background: 226 41% 7%;
-  --foreground: 214 24% 93%;
-  --card: 223 38% 14%;
-  --card-elevated: 223 33% 17%;
-  --card-foreground: 214 24% 93%;
-  --primary: 160 84% 39%;
-  --primary-hover: 158 78% 45%;
-  --primary-active: 162 74% 33%;
+  --background: 222 47% 6%;
+  --foreground: 210 28% 93%;
+  --card: 220 42% 12%;
+  --card-elevated: 220 37% 15%;
+  --card-foreground: 210 28% 93%;
+  --primary: 192 94% 40%;
+  --primary-hover: 191 88% 47%;
+  --primary-active: 193 82% 33%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 258 90% 66%;
+  --secondary: 217 91% 60%;
   --secondary-foreground: 0 0% 100%;
-  --muted: 223 27% 22%;
-  --muted-foreground: 215 14% 72%;
-  --border: 223 24% 28%;
-  --input: 223 22% 25%;
-  --ring: 160 84% 39%;
-  --success: 158 64% 52%;
+  --muted: 220 32% 20%;
+  --muted-foreground: 212 18% 70%;
+  --border: 220 28% 26%;
+  --input: 220 26% 22%;
+  --ring: 191 88% 47%;
+  --success: 190 86% 44%;
   --success-foreground: 0 0% 100%;
   --danger: 349 95% 71%;
   --danger-foreground: 344 70% 97%;
-  --disabled: 218 12% 54%;
+  --disabled: 216 14% 52%;
 }
 
 .light {
-  --background: 210 40% 96%;
-  --foreground: 222 35% 14%;
+  --background: 210 44% 96%;
+  --foreground: 220 38% 12%;
   --card: 0 0% 100%;
-  --card-elevated: 210 28% 98%;
-  --card-foreground: 222 35% 14%;
-  --primary: 158 96% 30%;
-  --primary-hover: 158 82% 35%;
-  --primary-active: 158 88% 25%;
+  --card-elevated: 210 32% 98%;
+  --card-foreground: 220 38% 12%;
+  --primary: 191 98% 32%;
+  --primary-hover: 191 84% 38%;
+  --primary-active: 192 92% 26%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 262 83% 58%;
+  --secondary: 217 84% 54%;
   --secondary-foreground: 0 0% 100%;
-  --muted: 215 33% 92%;
-  --muted-foreground: 222 14% 38%;
-  --border: 214 28% 84%;
-  --input: 214 28% 84%;
-  --ring: 158 96% 30%;
-  --success: 142 76% 36%;
+  --muted: 213 38% 90%;
+  --muted-foreground: 220 18% 36%;
+  --border: 212 32% 82%;
+  --input: 212 32% 82%;
+  --ring: 191 84% 38%;
+  --success: 191 80% 36%;
   --success-foreground: 0 0% 100%;
   --danger: 347 77% 50%;
   --danger-foreground: 0 0% 100%;
-  --disabled: 219 13% 45%;
+  --disabled: 217 14% 44%;
 }
 
 *,
@@ -65,8 +65,8 @@ html {
 body {
   @apply bg-background text-foreground antialiased;
   background-image:
-    radial-gradient(1200px 620px at -15% -25%, rgba(16, 185, 129, 0.14), transparent 58%),
-    radial-gradient(980px 520px at 112% -15%, rgba(139, 92, 246, 0.13), transparent 52%);
+    radial-gradient(1200px 620px at -15% -25%, rgba(6, 182, 212, 0.13), transparent 58%),
+    radial-gradient(980px 520px at 112% -15%, rgba(59, 130, 246, 0.12), transparent 52%);
   font-family: Manrope, sans-serif;
 }
 
@@ -80,11 +80,16 @@ h4 {
 @layer utilities {
   .surface-glass {
     background-color: hsl(var(--card) / 0.88);
-    @apply border border-border/65 backdrop-blur-xl shadow-[0_16px_42px_rgba(9,12,18,0.42)];
+    @apply border border-border/65 backdrop-blur-xl;
+    box-shadow: 0 16px 42px rgba(4, 9, 20, 0.45);
   }
 
   .elevate-hover {
-    @apply transition-all duration-150 ease-in-out hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(9,12,18,0.45)];
+    @apply transition-all duration-150 ease-in-out hover:-translate-y-0.5;
+  }
+
+  .elevate-hover:hover {
+    box-shadow: 0 16px 36px rgba(4, 9, 20, 0.48);
   }
 
   .page-enter {
@@ -93,6 +98,47 @@ h4 {
 
   .skeleton {
     @apply animate-pulse rounded-xl bg-muted/70;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply text-primary-foreground shadow-[0_10px_24px_rgba(58,66,90,0.38)];
+    background: linear-gradient(to bottom, hsl(var(--primary-hover)), hsl(var(--primary)));
+    transition: background 120ms ease;
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(to bottom, hsl(var(--primary)), hsl(var(--primary-active)));
+  }
+
+  .light .btn-primary {
+    background: hsl(var(--primary));
+  }
+
+  .light .btn-primary:hover {
+    background: hsl(var(--primary-hover));
+  }
+
+  .btn-secondary {
+    @apply border text-foreground shadow-sm;
+    border-color: hsl(var(--border) / 0.8);
+    background: hsl(var(--card-elevated) / 0.7);
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+
+  .btn-secondary:hover {
+    background: hsl(var(--muted) / 0.55);
+  }
+
+  .light .btn-secondary {
+    border-color: hsl(217 84% 54% / 0.6);
+    background: hsl(217 84% 54% / 0.06);
+  }
+
+  .light .btn-secondary:hover {
+    background: hsl(217 84% 54% / 0.12);
+    border-color: hsl(217 84% 45%);
   }
 }
 
