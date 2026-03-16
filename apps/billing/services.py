@@ -68,8 +68,9 @@ def resolve_plan(plan_value=None, plan_id=None):
     return plan
 
 
-def create_workspace_order(*, tenant, plan):
-    client, key_id = get_razorpay_client()
+def create_workspace_order(*, tenant, plan, client=None, key_id=None):
+    if client is None or key_id is None:
+        client, key_id = get_razorpay_client()
     order = client.order.create(
         {
             "amount": int(plan.price),
