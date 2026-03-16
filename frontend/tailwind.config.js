@@ -24,6 +24,8 @@ export default {
         "primary-hover": "hsl(var(--primary-hover))",
         "primary-active": "hsl(var(--primary-active))",
         "primary-foreground": "hsl(var(--primary-foreground))",
+        secondary: "hsl(var(--secondary))",
+        "secondary-foreground": "hsl(var(--secondary-foreground))",
         muted: "hsl(var(--muted))",
         "muted-foreground": "hsl(var(--muted-foreground))",
         success: "hsl(var(--success))",

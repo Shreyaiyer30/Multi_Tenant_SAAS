@@ -26,15 +26,25 @@ function RouteFallback() {
 
 function ProtectedLayout() {
   const location = useLocation();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("sidebarCollapsed") === "true";
+  });
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     setMobileSidebarOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    localStorage.setItem("sidebarCollapsed", String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+
   return (
-    <div className="min-h-screen bg-background lg:grid" style={{ gridTemplateColumns: sidebarCollapsed ? "72px 1fr" : "260px 1fr" }}>
+    <div
+      className="min-h-screen bg-background lg:grid lg:transition-[grid-template-columns] lg:duration-300"
+      style={{ gridTemplateColumns: sidebarCollapsed ? "72px 1fr" : "260px 1fr" }}
+    >
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}

@@ -1,51 +1,55 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: 222 19% 9%;
-  --foreground: 220 19% 92%;
-  --card: 223 19% 13%;
-  --card-elevated: 223 17% 16%;
-  --card-foreground: 220 19% 92%;
-  --primary: 223 16% 50%;
-  --primary-hover: 223 18% 57%;
-  --primary-active: 223 17% 43%;
-  --primary-foreground: 220 22% 96%;
-  --muted: 223 15% 18%;
-  --muted-foreground: 220 12% 68%;
-  --border: 223 14% 24%;
-  --input: 223 14% 22%;
-  --ring: 223 17% 52%;
-  --success: 152 17% 41%;
-  --success-foreground: 151 23% 90%;
-  --danger: 344 18% 46%;
-  --danger-foreground: 340 35% 92%;
-  --disabled: 220 10% 52%;
+  --background: 226 41% 7%;
+  --foreground: 214 24% 93%;
+  --card: 223 38% 14%;
+  --card-elevated: 223 33% 17%;
+  --card-foreground: 214 24% 93%;
+  --primary: 160 84% 39%;
+  --primary-hover: 158 78% 45%;
+  --primary-active: 162 74% 33%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 258 90% 66%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 223 27% 22%;
+  --muted-foreground: 215 14% 72%;
+  --border: 223 24% 28%;
+  --input: 223 22% 25%;
+  --ring: 160 84% 39%;
+  --success: 158 64% 52%;
+  --success-foreground: 0 0% 100%;
+  --danger: 349 95% 71%;
+  --danger-foreground: 344 70% 97%;
+  --disabled: 218 12% 54%;
 }
 
 .light {
-  --background: 220 18% 98%;
-  --foreground: 224 17% 16%;
+  --background: 210 40% 96%;
+  --foreground: 222 35% 14%;
   --card: 0 0% 100%;
-  --card-elevated: 220 18% 96%;
-  --card-foreground: 224 17% 16%;
-  --primary: 223 20% 47%;
-  --primary-hover: 223 23% 53%;
-  --primary-active: 223 18% 41%;
+  --card-elevated: 210 28% 98%;
+  --card-foreground: 222 35% 14%;
+  --primary: 158 96% 30%;
+  --primary-hover: 158 82% 35%;
+  --primary-active: 158 88% 25%;
   --primary-foreground: 0 0% 100%;
-  --muted: 223 20% 93%;
-  --muted-foreground: 224 11% 41%;
-  --border: 224 20% 86%;
-  --input: 224 20% 86%;
-  --ring: 223 20% 48%;
-  --success: 152 20% 38%;
-  --success-foreground: 152 20% 97%;
-  --danger: 344 20% 42%;
-  --danger-foreground: 344 30% 95%;
-  --disabled: 220 11% 50%;
+  --secondary: 262 83% 58%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 215 33% 92%;
+  --muted-foreground: 222 14% 38%;
+  --border: 214 28% 84%;
+  --input: 214 28% 84%;
+  --ring: 158 96% 30%;
+  --success: 142 76% 36%;
+  --success-foreground: 0 0% 100%;
+  --danger: 347 77% 50%;
+  --danger-foreground: 0 0% 100%;
+  --disabled: 219 13% 45%;
 }
 
 *,
@@ -61,9 +65,16 @@ html {
 body {
   @apply bg-background text-foreground antialiased;
   background-image:
-    radial-gradient(1200px 600px at -10% -20%, rgba(107, 118, 145, 0.16), transparent 55%),
-    radial-gradient(900px 500px at 110% -10%, rgba(71, 77, 95, 0.14), transparent 50%);
-  font-family: Inter, sans-serif;
+    radial-gradient(1200px 620px at -15% -25%, rgba(16, 185, 129, 0.14), transparent 58%),
+    radial-gradient(980px 520px at 112% -15%, rgba(139, 92, 246, 0.13), transparent 52%);
+  font-family: Manrope, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: Sora, sans-serif;
 }
 
 @layer utilities {
