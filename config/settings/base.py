@@ -141,10 +141,9 @@ INSTALLED_APPS = [
     "apps.dashboard",
     "apps.reporting",
 ]
-
 MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -152,10 +151,11 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.common.middleware.TenantMiddleware",
-   ]
-
+]
 ROOT_URLCONF = "config.urls"
-
+CSRF_TRUSTED_ORIGINS = [
+    "https://natural-sparkle-production-a4a9.up.railway.app",
+]
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -233,7 +233,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://natural-sparkle-production-a4a9.up.railway.app",
 ]
 CORS_ALLOW_HEADERS = [*default_headers, "x-tenant"]
-
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = True
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
 RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
