@@ -4,20 +4,60 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+import dj_database_url
 from corsheaders.defaults import default_headers
 from dotenv import load_dotenv
-import os
-import dj_database_url
-
-DATABASES = {
-    "default": dj_database_url.config(
-        default=os.environ.get("DATABASE_URL")
-    )
-}
-
-load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+load_dotenv(BASE_DIR / ".env")
+
+DATABASES = {
+    "default": dj_database_url.parse(
+        os.environ.get("DATABASE_URL")
+    )
+}
+def _build_database_settings():
+    database_url = os.getenv("DATABASE_URL", "").strip().strip('"').strip("'")
+    ssl_required = os.getenv("DB_SSL_REQUIRE", "False").lower() == "true"
+
+    if database_url:
+        return dj_database_url.parse(
+            database_url,
+            conn_max_age=600,
+            ssl_require=ssl_required,
+        )
+
+    pg_host = os.getenv("PGHOST")
+    pg_name = os.getenv("PGDATABASE")
+    if pg_host and pg_name:
+        return {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": pg_name,
+            "USER": os.getenv("PGUSER", ""),
+            "PASSWORD": os.getenv("PGPASSWORD", ""),
+            "HOST": pg_host,
+            "PORT": os.getenv("PGPORT", "5432"),
+            "CONN_MAX_AGE": 600,
+        }
+
+    # db_name = os.getenv("DB_NAME")
+    # if db_name:
+    #     return {
+    #         "ENGINE": "django.db.backends.postgresql",
+    #         "NAME": db_name,
+    #         "USER": os.getenv("DB_USER", ""),
+    #         "PASSWORD": os.getenv("DB_PASSWORD", ""),
+    #         "HOST": os.getenv("DB_HOST", "127.0.0.1"),
+    #         "PORT": os.getenv("DB_PORT", "5432"),
+    #         "CONN_MAX_AGE": 600,
+    #     }
+
+    # # Last-resort fallback for environments where Postgres isn't configured yet.
+    # return {
+    #     "ENGINE": "django.db.backends.sqlite3",
+    #     "NAME": BASE_DIR / "db.sqlite3",
+    # }
+
 
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-change-me")
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
@@ -82,26 +122,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-DB_ENGINE = os.getenv("DB_ENGINE", "django.db.backends.postgresql")
-if DB_ENGINE == "django.db.backends.sqlite3":
-    DATABASES = {
-        "default": {
-            "ENGINE": DB_ENGINE,
-            "NAME": os.getenv("DB_NAME", str(BASE_DIR / "db.sqlite3")),
-        }
-    }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": DB_ENGINE,
-            "NAME": os.getenv("DB_NAME", "tasksaas"),
-            "USER": os.getenv("DB_USER", "postgres"),
-            "PASSWORD": os.getenv("DB_PASSWORD", "postgres"),
-            "HOST": os.getenv("DB_HOST", "127.0.0.1"),
-            "PORT": os.getenv("DB_PORT", "5432"),
-        }
-    }
-
+DATABASES = {"default": _build_database_settings()}
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
