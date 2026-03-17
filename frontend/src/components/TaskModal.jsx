@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import api from "@/api/api";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,49 @@ const progressByStatus = {
   done: 100
 };
 
+const MENTION_PATTERN = /@(\w+)/g;
+
+function normalizeMentionHandle(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function extractMentionContext(value, cursor) {
+  const atIndex = value.lastIndexOf("@", cursor - 1);
+  if (atIndex < 0) return null;
+  const prefix = value.slice(0, atIndex);
+  if (prefix && !/\s$/.test(prefix)) return null;
+  const query = value.slice(atIndex + 1, cursor);
+  if (!/^\w*$/.test(query)) return null;
+  return { start: atIndex, end: cursor, query };
+}
+
+function renderCommentWithMentions(body) {
+  const parts = String(body || "").split(/(@\w+)/g);
+  return parts.map((part, index) => {
+    if (/^@\w+$/.test(part)) {
+      return (
+        <span key={`${part}-${index}`} className="font-semibold text-sky-400">
+          {part}
+        </span>
+      );
+    }
+    return <span key={`${part}-${index}`}>{part}</span>;
+  });
+}
+
 export default function TaskModal({ task, open, onOpenChange, onUpdated, onDeleted }) {
   const [form, setForm] = useState(task || {});
   const [comments, setComments] = useState([]);
   const [activity, setActivity] = useState([]);
   const [members, setMembers] = useState([]);
+  const [workspaceMembers, setWorkspaceMembers] = useState([]);
   const [comment, setComment] = useState("");
+  const [mentionContext, setMentionContext] = useState(null);
+  const commentInputRef = useRef(null);
 
   useEffect(() => {
     setForm(task || {});
@@ -35,8 +72,72 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated, onDelet
       if (task?.project) {
         api.get(`projects/${task.project}/members/`).then(res => setMembers(res.data)).catch(() => setMembers([]));
       }
+      api
+        .get("members/")
+        .then((res) => setWorkspaceMembers(res.data.results || res.data || []))
+        .catch(() => setWorkspaceMembers([]));
     }
   }, [task]);
+
+  const mentionableMembers = useMemo(() => {
+    return workspaceMembers
+      .map((membership) => {
+        const user = membership?.user || {};
+        const displayName = user.display_name || user.email || "Member";
+        const email = user.email || "";
+        const handle =
+          normalizeMentionHandle(displayName) || normalizeMentionHandle(email.split("@")[0]) || "member";
+        return {
+          id: String(user.id),
+          displayName,
+          email,
+          handle,
+          search: `${displayName} ${email} ${handle}`.toLowerCase()
+        };
+      })
+      .filter((member) => member.id);
+  }, [workspaceMembers]);
+
+  const mentionOptions = useMemo(() => {
+    if (!mentionContext) return [];
+    const query = normalizeMentionHandle(mentionContext.query);
+    return mentionableMembers
+      .filter((member) => !query || member.search.includes(query))
+      .slice(0, 6);
+  }, [mentionContext, mentionableMembers]);
+
+  const extractMentionIds = (text) => {
+    MENTION_PATTERN.lastIndex = 0;
+    const handleToMember = mentionableMembers.reduce((acc, member) => {
+      if (!acc[member.handle]) acc[member.handle] = member;
+      return acc;
+    }, {});
+    const seen = new Set();
+    const ids = [];
+    const matches = String(text || "").matchAll(MENTION_PATTERN);
+    for (const match of matches) {
+      const handle = normalizeMentionHandle(match[1]);
+      const member = handleToMember[handle];
+      if (!member || seen.has(member.id)) continue;
+      seen.add(member.id);
+      ids.push(member.id);
+    }
+    return ids;
+  };
+
+  const insertMention = (member) => {
+    if (!mentionContext) return;
+    const mentionToken = `@${member.handle} `;
+    const updated = `${comment.slice(0, mentionContext.start)}${mentionToken}${comment.slice(mentionContext.end)}`;
+    const cursorPosition = mentionContext.start + mentionToken.length;
+    setComment(updated);
+    setMentionContext(null);
+    requestAnimationFrame(() => {
+      if (!commentInputRef.current) return;
+      commentInputRef.current.focus();
+      commentInputRef.current.setSelectionRange(cursorPosition, cursorPosition);
+    });
+  };
 
   const saveTask = async () => {
     try {
@@ -56,9 +157,11 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated, onDelet
   const postComment = async () => {
     if (!comment.trim()) return;
     try {
-      const { data } = await api.post(`tasks/${task.id}/comments/`, { body: comment });
+      const mentions = extractMentionIds(comment);
+      const { data } = await api.post(`tasks/${task.id}/comments/`, { body: comment, mentions });
       setComments((prev) => [...prev, data]);
       setComment("");
+      setMentionContext(null);
     } catch {
       toast.error("Failed to post comment");
     }
@@ -163,11 +266,60 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated, onDelet
                       {c?.author?.display_name || "Member"}
                     </button>
                   </div>
-                  <p className="text-sm">{c.body}</p>
+                  <p className="text-sm">{renderCommentWithMentions(c.body)}</p>
                 </div>
               )) : <p className="text-sm text-muted-foreground">No comments yet.</p>}
             </div>
-            <Input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Add a comment" />
+            <div className="relative">
+              {mentionContext ? (
+                <div className="absolute bottom-full left-0 right-0 z-20 mb-2 max-h-48 overflow-auto rounded-md border border-border/80 bg-card p-1 shadow-xl">
+                  {mentionOptions.length ? (
+                    mentionOptions.map((member) => (
+                      <button
+                        key={member.id}
+                        type="button"
+                        className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted/50"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          insertMention(member);
+                        }}
+                      >
+                        <span className="font-medium">{member.displayName}</span>
+                        <span className="text-xs text-muted-foreground">@{member.handle}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="px-2 py-1 text-xs text-muted-foreground">No workspace member found.</p>
+                  )}
+                </div>
+              ) : null}
+              <textarea
+                ref={commentInputRef}
+                value={comment}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setComment(next);
+                  setMentionContext(extractMentionContext(next, event.target.selectionStart ?? next.length));
+                }}
+                onKeyDown={(event) => {
+                  if (mentionContext && mentionOptions.length && (event.key === "Enter" || event.key === "Tab")) {
+                    event.preventDefault();
+                    insertMention(mentionOptions[0]);
+                  }
+                  if (event.key === "Escape") {
+                    setMentionContext(null);
+                  }
+                }}
+                onClick={(event) => {
+                  const next = event.currentTarget.value;
+                  setMentionContext(extractMentionContext(next, event.currentTarget.selectionStart ?? next.length));
+                }}
+                onBlur={() => setTimeout(() => setMentionContext(null), 120)}
+                rows={3}
+                placeholder="Add a comment and type @ to mention workspace members"
+                className="w-full rounded-xl border border-border/80 bg-background/80 px-3 py-2 text-sm outline-none transition-all duration-150 placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/60"
+              />
+            </div>
             <Button onClick={postComment}>Post Comment</Button>
           </TabsContent>
 

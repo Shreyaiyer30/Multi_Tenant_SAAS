@@ -58,6 +58,7 @@ class Comment(UUIDModel, TimeStampedModel, TenantScopedModel):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="comments")
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="comments")
     body = models.TextField()
+    mentions = models.JSONField(default=list, blank=True)
     edited = models.BooleanField(default=False)
 
     class Meta:

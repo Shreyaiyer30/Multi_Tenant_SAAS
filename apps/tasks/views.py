@@ -8,6 +8,8 @@ from rest_framework.views import APIView
 
 from apps.common.mixins import TenantScopedQuerysetMixin
 from apps.common.permissions import IsResourceOwnerOrTenantAdmin, IsTenantAdminOrOwner, IsTenantMember
+from apps.notifications.services import notify_users
+from apps.tasks.mentions import resolve_mentioned_users
 from apps.tasks.models import Comment, Notification, Task, TaskActivity
 from apps.tasks.serializers import CommentSerializer, NotificationSerializer, TaskSerializer
 from apps.tasks.services import TaskService
@@ -129,11 +131,26 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
 
         serializer = CommentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        mentioned_users = resolve_mentioned_users(
+            request.tenant,
+            serializer.validated_data["body"],
+            explicit_user_ids=serializer.validated_data.get("mentions"),
+        )
+        mention_ids = [str(user.id) for user in mentioned_users]
         comment = Comment.objects.create(
             tenant=request.tenant,
             task=task,
             author=request.user,
             body=serializer.validated_data["body"],
+            mentions=mention_ids,
+        )
+        notify_users(
+            request.tenant,
+            [user for user in mentioned_users if user.id != request.user.id],
+            n_type="mention",
+            message=f"{request.user.display_name} mentioned you in task '{task.title}'.",
+            payload={"task_id": str(task.id), "project_id": str(task.project_id), "comment_id": str(comment.id)},
+            actor=request.user,
         )
         return Response(CommentSerializer(comment).data, status=status.HTTP_201_CREATED)
 
@@ -153,9 +170,30 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
             body = request.data.get("body", "").strip()
             if not body:
                 return Response({"error": "validation_error", "detail": {"body": ["This field is required."]}}, status=status.HTTP_400_BAD_REQUEST)
+            previous_mentions = set(comment.mentions or [])
+            mentioned_users = resolve_mentioned_users(
+                request.tenant,
+                body,
+                explicit_user_ids=request.data.get("mentions"),
+            )
+            mention_ids = [str(user.id) for user in mentioned_users]
             comment.body = body
+            comment.mentions = mention_ids
             comment.edited = True
-            comment.save(update_fields=["body", "edited", "updated_at"])
+            comment.save(update_fields=["body", "mentions", "edited", "updated_at"])
+            new_mentioned_users = [
+                user
+                for user in mentioned_users
+                if str(user.id) not in previous_mentions and user.id != request.user.id
+            ]
+            notify_users(
+                request.tenant,
+                new_mentioned_users,
+                n_type="mention",
+                message=f"{request.user.display_name} mentioned you in task '{task.title}'.",
+                payload={"task_id": str(task.id), "project_id": str(task.project_id), "comment_id": str(comment.id)},
+                actor=request.user,
+            )
             return Response(CommentSerializer(comment).data)
 
         comment.delete()

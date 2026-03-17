@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import api from "@/api/api";
 import TaskModal from "@/components/TaskModal";
@@ -17,9 +18,15 @@ export default function Tasks() {
   const [openCreate, setOpenCreate] = useState(false);
   const { tenant } = useTenant();
   const { user } = useAuth();
+  const location = useLocation();
 
   const currentWorkspace = (user?.workspaces || []).find((ws) => ws.slug === tenant);
   const canCreate = currentWorkspace?.role === "admin" || currentWorkspace?.role === "owner";
+
+  const taskFilters = useMemo(() => {
+    const search = new URLSearchParams(location.search);
+    return Object.fromEntries(search.entries());
+  }, [location.search]);
 
   const assigneeNameById = members.reduce((acc, membership) => {
     const userId = membership?.user?.id;
@@ -30,8 +37,9 @@ export default function Tasks() {
   }, {});
 
   const loadTasks = () => {
+    const params = { ordering: "-updated_at", ...taskFilters };
     api
-      .get("tasks/")
+      .get("tasks/", { params })
       .then((res) => setTasks(res.data.results || res.data || []))
       .catch(() => setTasks([]));
   };
@@ -54,7 +62,7 @@ export default function Tasks() {
     loadMembers();
     loadProjects();
     loadTasks();
-  }, [tenant]);
+  }, [tenant, location.search]);
 
   const handleDeleteTask = async (taskId) => {
     if (!window.confirm("Delete this task? This action cannot be undone.")) return;

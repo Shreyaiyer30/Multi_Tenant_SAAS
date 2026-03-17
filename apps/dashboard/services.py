@@ -1,8 +1,42 @@
+from datetime import datetime, timedelta
+
 from django.db.models import Count
+from django.db.models.functions import TruncDate
+from django.utils import timezone
 
 from apps.audit.models import AuditLog
 from apps.projects.models import Project
 from apps.tasks.models import ActivityEvent, Task
+from apps.tenants.models import Membership
+
+RANGE_DAY_MAP = {
+    "7d": 7,
+    "30d": 30,
+    "90d": 90,
+}
+
+
+def resolve_range_days(raw_value):
+    if raw_value is None:
+        return "7d", 7
+    value = str(raw_value).strip().lower()
+    if value in RANGE_DAY_MAP:
+        return value, RANGE_DAY_MAP[value]
+    if value.isdigit():
+        numeric = int(value)
+        if numeric in RANGE_DAY_MAP.values():
+            return f"{numeric}d", numeric
+    return "7d", 7
+
+
+def _range_window(days):
+    end_date = timezone.localdate()
+    start_date = end_date - timedelta(days=days - 1)
+    start_dt = timezone.make_aware(
+        datetime.combine(start_date, datetime.min.time())
+    )
+    end_dt = timezone.now()
+    return start_date, end_date, start_dt, end_dt
 
 
 def _aggregate_counts(queryset, field_name, expected_keys):
@@ -90,3 +124,72 @@ def get_recent_activity(workspace, limit=10):
 
     activity.sort(key=lambda item: item["created_at"], reverse=True)
     return activity[:limit]
+
+
+def get_tasks_trend(workspace, range_value="7d"):
+    range_key, days = resolve_range_days(range_value)
+    start_date, end_date, start_dt, end_dt = _range_window(days)
+
+    rows = (
+        Task.objects.filter(
+            tenant=workspace,
+            status=Task.Status.DONE,
+            updated_at__gte=start_dt,
+            updated_at__lte=end_dt,
+        )
+        .annotate(day=TruncDate("updated_at"))
+        .values("day")
+        .annotate(completed=Count("id"))
+    )
+    counts = {row["day"]: row["completed"] for row in rows}
+
+    payload = []
+    cursor = start_date
+    while cursor <= end_date:
+        payload.append(
+            {
+                "date": cursor.isoformat(),
+                "label": cursor.strftime("%a") if days <= 7 else cursor.strftime("%b %d"),
+                "full_date": cursor.strftime("%b %d, %Y"),
+                "completed": int(counts.get(cursor, 0)),
+            }
+        )
+        cursor += timedelta(days=1)
+    return {"range": range_key, "results": payload}
+
+
+def get_team_performance(workspace, range_value="7d"):
+    range_key, days = resolve_range_days(range_value)
+    _, _, start_dt, end_dt = _range_window(days)
+
+    completed_rows = (
+        Task.objects.filter(
+            tenant=workspace,
+            status=Task.Status.DONE,
+            assignee__isnull=False,
+            updated_at__gte=start_dt,
+            updated_at__lte=end_dt,
+        )
+        .values("assignee")
+        .annotate(completed=Count("id"))
+    )
+    completed_by_user_id = {str(row["assignee"]): int(row["completed"]) for row in completed_rows}
+
+    members = Membership.objects.filter(tenant=workspace).select_related("user")
+    results = []
+    for membership in members:
+        user = membership.user
+        user_id = str(user.id)
+        completed = completed_by_user_id.get(user_id, 0)
+        if completed <= 0:
+            continue
+        results.append(
+            {
+                "member_id": user_id,
+                "name": user.display_name,
+                "completed": completed,
+            }
+        )
+
+    results.sort(key=lambda item: item["completed"], reverse=True)
+    return {"range": range_key, "results": results}
