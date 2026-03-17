@@ -104,7 +104,7 @@ h4 {
   }
 
   .skeleton {
-    @apply animate-pulse rounded-xl bg-surface2;
+    @apply animate-pulse rounded-xl bg-card/60;
   }
 
   .custom-scrollbar::-webkit-scrollbar {
