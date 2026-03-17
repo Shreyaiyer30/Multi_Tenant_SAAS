@@ -1,149 +1,170 @@
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib";
-import WorkspaceSwitcher from "@/components/WorkspaceSwitcher";
 import { useAuth } from "@/context/AuthContext";
 import { useTenant } from "@/context/TenantContext";
+import { 
+  Grid, 
+  CheckSquare, 
+  Folder, 
+  Calendar, 
+  Users, 
+  MessageCircle, 
+  BarChart, 
+  Settings as SettingsIcon,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  ChevronDown,
+  ArrowUpDown
+} from "lucide-react";
 
 const mainNav = [
-  { label: "Dashboard", href: "/dashboard", icon: "◰" },
-  { label: "Projects", href: "/projects", icon: "📁" },
-  { label: "Tasks", href: "/tasks", icon: "☰", badge: 3 },
-  { label: "Calendar", href: "/calendar", icon: "📅" },
+  { label: "Dashboard", href: "/dashboard", icon: Grid },
+  { label: "Tasks", href: "/tasks", icon: CheckSquare, badge: 3 },
+  { label: "Projects", href: "/projects", icon: Folder },
+  { label: "Calendar", href: "/calendar", icon: Calendar },
 ];
 
 const teamNav = [
-  { label: "Members", href: "/members", icon: "👥" },
-  { label: "Messages", href: "/messages", icon: "✉", badge: 2, badgeColor: "var(--accent3)" },
+  { label: "Members", href: "/members", icon: Users },
+  { label: "Messages", href: "/messages", icon: MessageCircle, badge: 2 },
 ];
 
 const insightNav = [
-  { label: "Reports", href: "/reports", icon: "📊" },
-  { label: "Settings", href: "/settings", icon: "⚙" },
+  { label: "Reports", href: "/reports", icon: BarChart },
+  { label: "Settings", href: "/settings", icon: SettingsIcon },
 ];
 
-function SidebarContent({
-  collapsed,
-  onNavigate,
-  user,
-  currentWorkspace,
-  logout,
-  pathname
-}) {
-  const roleLabel = (currentWorkspace?.role || "member");
+function NavItem({ item, collapsed, pathname, onClick }) {
+  const active = pathname === item.href;
+  const Icon = item.icon;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden" style={{ color: 'var(--text)' }}>
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-2 py-4 space-y-6">
-        {/* Project Switcher */}
+    <button
+      onClick={() => onClick(item.href)}
+      className={cn(
+        "group relative flex items-center gap-3 w-full h-10 transition-all duration-200 px-4",
+        active ? "text-accent bg-accent/5" : "text-muted hover:text-text hover:bg-surface2/50"
+      )}
+    >
+      {active && (
+        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-accent shadow-[2px_0_10px_rgba(0,229,192,0.4)]" />
+      )}
+      
+      <div className={cn(
+        "shrink-0 transition-colors",
+        active ? "text-accent" : "text-muted group-hover:text-text"
+      )}>
+        <Icon size={16} strokeWidth={active ? 2.5 : 2} />
+      </div>
+
+      {!collapsed && (
+        <span className={cn(
+          "flex-1 text-left text-xs font-medium tracking-tight font-dm-mono",
+          active ? "text-accent" : ""
+        )}>
+          {item.label}
+        </span>
+      )}
+
+      {!collapsed && item.badge && (
+        <span className={cn(
+          "px-1.5 py-0.5 rounded-full text-[9px] font-black",
+          active ? "bg-accent/20 text-accent" : "bg-surface2 text-accent"
+        )}>
+          {item.badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function SidebarContent({ collapsed, onNavigate, user, currentWorkspace, logout, pathname }) {
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex-1 overflow-y-auto custom-scrollbar pt-4 pb-4 space-y-6">
+        
+        {/* Workspace Switcher */}
         {!collapsed && (
-          <div 
-            className="mx-2 p-3 rounded-xl border cursor-pointer hover:bg-surface2 transition-all group"
-            style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface2)' }}
-          >
-            <div className="text-[10px] text-muted uppercase font-bold mb-1">Workspace</div>
-            <div className="flex items-center justify-between">
-              <span className="font-syne font-semibold truncate">{currentWorkspace?.name || "Select Workspace"}</span>
-              <span className="text-xs group-hover:translate-y-px transition-transform">⇅</span>
-            </div>
+          <div className="px-4 mb-4">
+            <div className="text-[9px] font-black text-muted uppercase tracking-[0.15em] mb-2 opacity-60 font-dm-mono">Current Workspace</div>
+            <button 
+              className="w-full flex items-center justify-between p-3 rounded-xl border border-border/50 bg-surface2/30 hover:bg-surface2/50 transition-all text-left"
+            >
+              <span className="text-xs font-bold text-text truncate max-w-[140px] font-syne">
+                {currentWorkspace?.name || "Task Management"}
+              </span>
+              <ArrowUpDown size={12} className="text-muted" />
+            </button>
           </div>
         )}
 
         {/* Navigation Sections */}
-        <section>
-          {!collapsed && <div className="px-4 text-[10px] font-bold text-muted uppercase tracking-widest mb-2">Main</div>}
-          <div className="space-y-1">
-            {mainNav.map((item) => {
-              const active = pathname === item.href;
-              return (
-                <button
-                  key={item.label}
-                  onClick={() => onNavigate(item.href)}
-                  className={cn(
-                    "w-full flex items-center gap-3 p-2.5 px-4 transition-colors rounded-none",
-                    active ? "nav-item-active" : "hover:text-accent text-muted"
-                  )}
-                >
-                  <span className="text-lg w-5 text-center">{item.icon}</span>
-                  {!collapsed && <span className="flex-1 text-left font-medium">{item.label}</span>}
-                  {!collapsed && item.badge && (
-                    <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-surface2 border border-border text-white">{item.badge}</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </section>
+        <div className="space-y-6">
+          <section>
+            {!collapsed && <div className="px-4 text-[9px] font-black text-muted uppercase tracking-[0.2em] mb-3 opacity-40 font-dm-mono">Main</div>}
+            <div className="space-y-0.5">
+              {mainNav.map((item) => (
+                <NavItem key={item.label} item={item} collapsed={collapsed} pathname={pathname} onClick={onNavigate} />
+              ))}
+            </div>
+          </section>
 
-        <section>
-          {!collapsed && <div className="px-4 text-[10px] font-bold text-muted uppercase tracking-widest mb-2">Team</div>}
-          <div className="space-y-1">
-            {teamNav.map((item) => {
-              const active = pathname === item.href;
-              return (
-                <button
-                  key={item.label}
-                  onClick={() => onNavigate(item.href)}
-                  className={cn(
-                    "w-full flex items-center gap-3 p-2.5 px-4 transition-colors rounded-none",
-                    active ? "nav-item-active" : "hover:text-accent text-muted"
-                  )}
-                >
-                  <span className="text-lg w-5 text-center">{item.icon}</span>
-                  {!collapsed && <span className="flex-1 text-left font-medium">{item.label}</span>}
-                  {!collapsed && item.badge && (
-                    <span 
-                      className="px-1.5 py-0.5 rounded-full text-[10px] text-white" 
-                      style={{ backgroundColor: item.badgeColor || 'var(--surface2)', border: '1px solid var(--border)' }}
-                    >{item.badge}</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </section>
+          <section>
+            {!collapsed && <div className="px-4 text-[9px] font-black text-muted uppercase tracking-[0.2em] mb-3 opacity-40 font-dm-mono">Team</div>}
+            <div className="space-y-0.5">
+              {teamNav.map((item) => (
+                <NavItem key={item.label} item={item} collapsed={collapsed} pathname={pathname} onClick={onNavigate} />
+              ))}
+            </div>
+          </section>
 
-        <section>
-          {!collapsed && <div className="px-4 text-[10px] font-bold text-muted uppercase tracking-widest mb-2">Insights</div>}
-          <div className="space-y-1">
-            {insightNav.map((item) => {
-              const active = pathname === item.href;
-              return (
-                <button
-                  key={item.label}
-                  onClick={() => onNavigate(item.href)}
-                  className={cn(
-                    "w-full flex items-center gap-3 p-2.5 px-4 transition-colors rounded-none",
-                    active ? "nav-item-active" : "hover:text-accent text-muted"
-                  )}
-                >
-                  <span className="text-lg w-5 text-center">{item.icon}</span>
-                  {!collapsed && <span className="flex-1 text-left font-medium">{item.label}</span>}
-                </button>
-              );
-            })}
-          </div>
-        </section>
+          <section>
+            {!collapsed && <div className="px-4 text-[9px] font-black text-muted uppercase tracking-[0.2em] mb-3 opacity-40 font-dm-mono">Insights</div>}
+            <div className="space-y-0.5">
+              {insightNav.map((item) => (
+                <NavItem key={item.label} item={item} collapsed={collapsed} pathname={pathname} onClick={onNavigate} />
+              ))}
+            </div>
+          </section>
+        </div>
       </div>
 
-      {/* Sidebar Footer */}
-      {!collapsed && (
-        <div className="p-4 border-t" style={{ borderColor: 'var(--border)' }}>
-          <div className="flex items-center gap-3 group relative cursor-pointer" onClick={logout}>
+      {/* User Footer */}
+      <div className="p-4 mt-auto border-t border-border/50">
+        <div 
+          className={cn(
+            "group flex items-center gap-3 transition-all cursor-pointer p-2 rounded-xl hover:bg-surface2/50",
+            collapsed ? "justify-center" : ""
+          )}
+        >
+          <div className="shrink-0 relative">
             <div 
-              className="w-8 h-8 rounded-full flex-shrink-0" 
-              style={{ background: 'linear-gradient(135deg, var(--accent2), var(--accent5))' }}
-            />
-            <div className="overflow-hidden">
-              <div className="font-syne font-bold truncate text-text">{user?.display_name || user?.email || "User"}</div>
-              <div className="text-[10px] text-muted truncate capitalize">{roleLabel}</div>
-            </div>
-            <div className="absolute inset-0 bg-accent3/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
-              <span className="text-[10px] font-bold text-accent3">LOGOUT</span>
+              className="w-8 h-8 rounded-full flex items-center justify-center text-background font-black text-[10px] bg-accent2 shadow-lg"
+            >
+              {(user?.display_name || "SI").slice(0, 2).toUpperCase()}
             </div>
           </div>
+
+          {!collapsed && (
+            <div className="min-w-0 flex-1">
+              <div className="font-syne font-bold text-xs text-text truncate tracking-tight">
+                {user?.display_name || "Shreya Iyer"}
+              </div>
+              <div className="text-[8px] font-black text-muted uppercase tracking-widest mt-0.5">
+                Pro Member
+              </div>
+            </div>
+          )}
+          
+          {!collapsed && (
+            <button onClick={logout} className="text-muted hover:text-accent3 transition-colors p-1">
+              <LogOut size={14} />
+            </button>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -171,27 +192,29 @@ export default function Sidebar({
 
   return (
     <>
-      <style>{`
-        .nav-item-active {
-          background: linear-gradient(90deg, rgba(0, 229, 192, 0.1) 0%, transparent 100%);
-          border-left: 2px solid var(--accent);
-          color: var(--accent);
-        }
-      `}</style>
       <aside
         className={cn(
           "hidden h-screen border-r transition-all duration-300 lg:flex lg:flex-col lg:overflow-hidden z-30",
           collapsed ? "w-[60px]" : "w-[240px]"
         )}
-        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}
+        style={{ borderColor: 'var(--border)', backgroundColor: '#070b0f' }}
       >
-        <div className="flex items-center justify-between p-4 h-[58px] border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
+        <div className="flex items-center justify-between px-4 h-14 border-b border-border/50 shrink-0">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="min-w-[32px] h-8 rounded-lg flex items-center justify-center font-bold text-lg" style={{ background: 'var(--accent)', color: 'var(--background)' }}>F</div>
-            {!collapsed && <span className="font-syne font-bold tracking-tighter text-lg text-text">FLOWDESK</span>}
+            <div className="w-8 h-8 rounded-lg bg-accent text-background flex items-center justify-center font-black text-sm shrink-0">
+              F
+            </div>
+            {!collapsed && (
+              <span className="font-syne font-black tracking-widest text-base text-text uppercase">
+                Flow<span className="text-accent">Desk</span>
+              </span>
+            )}
           </div>
-          <button onClick={onToggleCollapsed} className="hover:text-accent transition-colors text-muted">
-            {collapsed ? '▶' : '◀'}
+          <button 
+            onClick={onToggleCollapsed} 
+            className="text-muted hover:text-accent transition-colors"
+          >
+            {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
           </button>
         </div>
 
@@ -216,18 +239,20 @@ export default function Sidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[240px] flex-col border-r transition-transform duration-200 lg:hidden",
+          "fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col border-r shadow-2xl transition-transform duration-300 transform lg:hidden",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
-        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}
+        style={{ borderColor: 'var(--border)', backgroundColor: '#070b0f' }}
       >
-        <div className="flex items-center justify-between p-4 h-[58px] border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
-           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="min-w-[32px] h-8 rounded-lg flex items-center justify-center font-bold text-lg" style={{ background: 'var(--accent)', color: 'var(--background)' }}>F</div>
-            <span className="font-syne font-bold tracking-tighter text-lg text-text">FLOWDESK</span>
+        <div className="flex items-center justify-between px-4 h-14 border-b border-border/50 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-accent text-background flex items-center justify-center font-black text-sm">
+              F
+            </div>
+            <span className="font-syne font-black tracking-widest text-base text-text uppercase">FLOWDESK</span>
           </div>
-          <button onClick={() => onMobileOpenChange?.(false)} className="text-muted hover:text-accent">
-            ✕
+          <button onClick={() => onMobileOpenChange?.(false)} className="text-muted">
+             ✕
           </button>
         </div>
         <SidebarContent

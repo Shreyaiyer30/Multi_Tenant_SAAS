@@ -15,6 +15,9 @@ const Notifications = lazy(() => import("@/pages/Notifications"));
 const Members = lazy(() => import("@/pages/Members"));
 const Reports = lazy(() => import("@/pages/Reports"));
 const Billing = lazy(() => import("@/pages/Billing"));
+const Calendar = lazy(() => import("@/pages/Calendar"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const Messages = lazy(() => import("@/pages/Messages"));
 
 function RouteFallback() {
   return (
@@ -44,7 +47,7 @@ function ProtectedLayout() {
   return (
     <div
       className="min-h-screen bg-background lg:grid lg:transition-[grid-template-columns] lg:duration-300"
-      style={{ gridTemplateColumns: sidebarCollapsed ? "60px 1fr" : "240px 1fr" }}
+      style={{ gridTemplateColumns: sidebarCollapsed ? "72px 1fr" : "260px 1fr" }}
     >
       <Sidebar
         collapsed={sidebarCollapsed}
@@ -103,6 +106,9 @@ export default function App() {
           <Route path="/members" element={<Members />} />
           <Route path="/billing" element={<Billing />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/messages" element={<Messages />} />
         </Route>
       </Routes>
     </Suspense>

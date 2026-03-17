@@ -50,7 +50,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='project',
-            constraint=models.CheckConstraint(check=models.Q(('completion_percent__gte', 0), ('completion_percent__lte', 100)), name='projects_project_completion_percent_0_100'),
+            constraint=models.CheckConstraint(condition=models.Q(('completion_percent__gte', 0), ('completion_percent__lte', 100)), name='projects_project_completion_percent_0_100'),
         ),
         migrations.AddField(
             model_name='projectmember',
@@ -80,3 +80,4 @@ class Migration(migrations.Migration):
             unique_together={('project', 'user')},
         ),
     ]
+

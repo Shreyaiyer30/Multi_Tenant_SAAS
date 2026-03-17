@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Search, UserPlus2, X } from "lucide-react";
+import { Check, Search, UserPlus2, X, Users, Shield, User, Trash2, ArrowRight } from "lucide-react";
 import api from "@/api/api";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { cn } from "@/lib";
 
 function initialsFor(user) {
   const display = user?.display_name || user?.email || "User";
@@ -66,7 +64,7 @@ export default function ProjectMembersModal({ open, onOpenChange, project, works
 
   const addMembers = async () => {
     if (!selectedIds.length) {
-      toast.error("Select at least one member");
+      toast.error("Select network entities first");
       return;
     }
 
@@ -75,12 +73,12 @@ export default function ProjectMembersModal({ open, onOpenChange, project, works
       await Promise.all(
         selectedIds.map((userId) => api.post(`projects/${project.id}/members/`, { user_id: userId, role }))
       );
-      toast.success(`Added ${selectedIds.length} member${selectedIds.length > 1 ? "s" : ""}`);
+      toast.success(`Broadcasting permissions to ${selectedIds.length} entities`);
       setSelectedIds([]);
       load();
       onUpdated?.();
     } catch {
-      toast.error("Failed to add one or more members");
+      toast.error("Permission broadcast failure");
     } finally {
       setSubmitting(false);
     }
@@ -89,147 +87,209 @@ export default function ProjectMembersModal({ open, onOpenChange, project, works
   const removeMember = async (targetUserId) => {
     try {
       await api.delete(`projects/${project.id}/members/${targetUserId}/`);
-      toast.success("Member removed");
+      toast.success("Entity disconnected");
       load();
       onUpdated?.();
     } catch {
-      toast.error("Failed to remove member");
+      toast.error("Disconnection failed");
     }
   };
 
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[90vh] w-[100vw] max-w-none flex-col overflow-hidden rounded-none p-0 sm:h-[88vh] sm:w-[95vw] sm:max-w-4xl sm:rounded-2xl">
-        <div className="p-6 pb-0">
-          <DialogHeader>
-            <DialogTitle>Manage Members</DialogTitle>
-            <DialogDescription>Add workspace users to this project and assign a role.</DialogDescription>
-          </DialogHeader>
-        </div>
-
-        <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto border-y border-border/70 md:grid-cols-2">
-          <section className="flex min-h-0 flex-col p-6 md:border-r md:border-border/70">
-            <div className="relative mb-4">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-                placeholder="Search workspace members"
-              />
-            </div>
-
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-              {availableUsers.length ? (
-                availableUsers.map((entry) => {
-                  const user = entry.user || {};
-                  const selected = selectedIds.includes(user.id);
-
-                  return (
-                    <button
-                      key={user.id}
-                      className="flex w-full items-center justify-between rounded-xl border border-border/70 bg-card/55 p-3 text-left transition-all duration-150 hover:bg-muted/30"
-                      onClick={() => toggleUser(user.id)}
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-hover to-primary text-xs font-semibold text-primary-foreground">
-                          {initialsFor(user)}
-                        </span>
-                        <span className="min-w-0">
-                          <p className="truncate text-sm font-medium">{user.display_name || "Workspace member"}</p>
-                          <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-                        </span>
-                      </div>
-                      <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full border ${selected ? "border-primary-hover bg-primary text-primary-foreground" : "border-border"}`}>
-                        {selected ? <Check className="h-3.5 w-3.5" /> : null}
-                      </span>
-                    </button>
-                  );
-                })
-              ) : (
-                <p className="rounded-xl border border-dashed border-border/80 p-6 text-center text-sm text-muted-foreground">
-                  No available users found.
-                </p>
-              )}
-            </div>
-          </section>
-
-          <section className="flex min-h-0 flex-col p-6">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Added ({selectedIds.length})</h3>
-              <span className="text-xs text-muted-foreground">Role will apply to all selected users</span>
-            </div>
-
-            <div className="min-h-[130px] max-h-[220px] space-y-2 overflow-y-auto pr-1">
-              {selectedUsers.length ? (
-                selectedUsers.map((entry) => {
-                  const user = entry.user || {};
-                  return (
-                    <div key={user.id} className="flex items-center justify-between rounded-xl border border-border/70 bg-card/55 px-3 py-2">
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-[11px] font-semibold text-primary-foreground">
-                          {initialsFor(user)}
-                        </span>
-                        <span className="min-w-0">
-                          <p className="truncate text-sm font-medium">{user.display_name || "Workspace member"}</p>
-                          <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-                        </span>
-                      </div>
-                      <button className="rounded-md p-1 text-muted-foreground transition hover:bg-muted/50 hover:text-foreground" onClick={() => toggleUser(user.id)}>
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="rounded-xl border border-dashed border-border/80 p-4 text-sm text-muted-foreground">
-                  Select users from the left to add them to this project.
-                </p>
-              )}
-            </div>
-
-            <div className="mt-6 min-h-0 flex-1">
-              <p className="mb-2 text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Current project members</p>
-              <div className="min-h-0 h-full max-h-[220px] space-y-2 overflow-y-auto pr-1">
-                {members.map((m) => (
-                  <div key={m.id} className="flex items-center justify-between rounded-xl border border-border/70 bg-muted/20 px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{m.user.display_name || m.user.email}</p>
-                      <p className="text-xs capitalize text-muted-foreground">{m.role}</p>
-                    </div>
-                    <Button variant="ghost" size="sm" className="h-8 text-danger-foreground hover:bg-danger/15" onClick={() => removeMember(m.user.id)}>
-                      Remove
-                    </Button>
-                  </div>
-                ))}
-                {!members.length ? <p className="text-sm text-muted-foreground">No members yet.</p> : null}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md bg-background/80">
+      <div 
+        className="w-full max-w-5xl h-[85vh] rounded-[3rem] border shadow-2xl animate-fade-up relative overflow-hidden flex flex-col"
+        style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+      >
+        {/* Header Section */}
+        <div className="p-8 border-b shrink-0 flex items-center justify-between bg-surface/40 backdrop-blur-xl" style={{ borderColor: 'var(--border)' }}>
+           <div className="flex items-center gap-5">
+              <div className="w-14 h-14 bg-accent/10 border border-accent/20 rounded-3xl flex items-center justify-center text-accent">
+                 <Users size={28} />
               </div>
-            </div>
-          </section>
+              <div>
+                 <h2 className="text-3xl font-syne font-black text-text tracking-tighter uppercase leading-none">Network Permission Manager</h2>
+                 <p className="text-[10px] text-muted font-black uppercase tracking-[0.2em] mt-2 flex items-center gap-2">
+                    <Shield size={12} className="text-accent" /> Node: {project?.name || "Global"}
+                 </p>
+              </div>
+           </div>
+           <button 
+             onClick={() => onOpenChange(false)}
+             className="w-12 h-12 flex items-center justify-center rounded-2xl bg-surface2 text-muted hover:text-white transition-all border border-border hover:border-accent/40"
+           >
+             <X size={24} />
+           </button>
         </div>
 
-        <div className="flex flex-col items-stretch gap-3 border-t border-border/70 bg-card/90 px-4 py-4 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <UserPlus2 className="h-4 w-4" />
-            {selectedIds.length} user{selectedIds.length === 1 ? "" : "s"} selected
-          </div>
+        {/* Binary Panel Split */}
+        <div className="flex-1 flex min-h-0 overflow-hidden">
+           {/* Left: Discovery */}
+           <div className="w-1/2 flex flex-col border-r bg-surface2/20" style={{ borderColor: 'var(--border)' }}>
+             <div className="p-8 pb-4">
+                <div className="relative group">
+                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-accent transition-colors" size={18} />
+                   <input 
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Scan network for entities..."
+                      className="w-full h-14 bg-surface2 rounded-2xl border border-border pl-12 pr-6 text-sm text-text focus:border-accent focus:outline-none transition-all placeholder:text-muted/40 font-dm-mono uppercase tracking-widest"
+                   />
+                </div>
+                <div className="flex items-center justify-between mt-6 px-2">
+                   <span className="text-[10px] font-black text-muted uppercase tracking-[0.2em] opacity-40">Available Entities</span>
+                   <span className="text-[10px] font-dm-mono text-accent">{availableUsers.length} detected</span>
+                </div>
+             </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <select
-              className="h-11 w-full rounded-xl border border-border/80 bg-background/80 px-3 text-sm sm:h-10 sm:w-auto"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-            >
-              <option value="admin">Admin</option>
-              <option value="member">Member</option>
-            </select>
-            <Button variant="ghost" className="h-11 w-full sm:h-10 sm:w-auto" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button className="h-11 w-full sm:h-10 sm:w-auto" onClick={addMembers} disabled={submitting || !selectedIds.length}>
-              {submitting ? "Adding..." : `Add Members (${selectedIds.length})`}
-            </Button>
-          </div>
+             <div className="flex-1 overflow-y-auto px-8 py-4 custom-scrollbar space-y-3">
+                {availableUsers.map((entry) => {
+                   const user = entry.user || {};
+                   const selected = selectedIds.includes(user.id);
+                   return (
+                      <button
+                        key={user.id}
+                        onClick={() => toggleUser(user.id)}
+                        className={cn(
+                           "w-full flex items-center justify-between p-4 rounded-2xl border transition-all group",
+                           selected ? "bg-accent/10 border-accent/60 shadow-lg" : "bg-surface/40 border-border/50 hover:bg-surface hover:border-accent/30"
+                        )}
+                      >
+                         <div className="flex items-center gap-4 min-w-0">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent2 to-accent5 flex items-center justify-center text-[10px] font-black text-white shadow-lg shrink-0">
+                               {initialsFor(user)}
+                            </div>
+                            <div className="min-w-0 text-left">
+                               <p className={cn("text-sm font-bold truncate transition-colors", selected ? "text-accent" : "text-text")}>{user.display_name || "Unknown Entity"}</p>
+                               <p className="text-[10px] text-muted truncate font-dm-mono tracking-tighter">{user.email}</p>
+                            </div>
+                         </div>
+                         <div className={cn(
+                            "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all",
+                            selected ? "bg-accent border-accent text-background" : "border-border group-hover:border-accent/40"
+                         )}>
+                            {selected && <Check size={14} strokeWidth={4} />}
+                         </div>
+                      </button>
+                   );
+                })}
+                {availableUsers.length === 0 && (
+                   <div className="h-full flex flex-col items-center justify-center text-muted/20 py-20">
+                      <Search size={48} className="mb-4" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em]">No Discovery results</p>
+                   </div>
+                )}
+             </div>
+           </div>
+
+           {/* Right: Active & Action */}
+           <div className="w-1/2 flex flex-col bg-surface/10">
+              <div className="flex-1 flex flex-col min-h-0">
+                 {/* Top: Current Selection For Add */}
+                 <div className="p-8">
+                    <div className="flex items-center justify-between mb-6">
+                       <h3 className="text-[10px] font-black text-muted uppercase tracking-[0.2em] opacity-40">Buffered for Connection</h3>
+                       <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-[9px] font-black uppercase tracking-widest">
+                          {selectedIds.length} Nodes Ready
+                       </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-2 max-h-[140px] overflow-y-auto custom-scrollbar p-1">
+                       {selectedUsers.map(entry => (
+                          <div key={entry.user?.id} className="flex items-center gap-3 bg-surface2 border border-border pr-2 pl-1 py-1 rounded-xl animate-fade-up">
+                             <div className="w-6 h-6 rounded-lg bg-surface flex items-center justify-center text-[8px] font-black text-muted">
+                                {initialsFor(entry.user)}
+                             </div>
+                             <span className="text-[10px] font-bold text-text truncate max-w-[100px]">{entry.user.display_name}</span>
+                             <button 
+                               onClick={() => toggleUser(entry.user?.id)}
+                               className="text-muted hover:text-accent3 transition-colors"
+                             >
+                                <X size={12} />
+                             </button>
+                          </div>
+                       ))}
+                       {selectedUsers.length === 0 && (
+                          <div className="w-full h-12 border-2 border-dashed border-border/50 rounded-2xl flex items-center justify-center text-muted/30 text-[10px] font-black uppercase tracking-widest">
+                             Awaiting Entity Selection
+                          </div>
+                       )}
+                    </div>
+                 </div>
+
+                 {/* Middle: Existing Members */}
+                 <div className="flex-1 flex flex-col min-h-0 border-t" style={{ borderColor: 'var(--border)' }}>
+                    <div className="px-8 py-6 flex items-center justify-between bg-surface2/20">
+                       <span className="text-[10px] font-black text-muted uppercase tracking-[0.2em] opacity-40">Active Operational Team</span>
+                       <span className="text-[10px] font-dm-mono text-accent">{members.length} Connected</span>
+                    </div>
+                    <div className="flex-1 overflow-y-auto px-8 py-2 custom-scrollbar space-y-3">
+                       {members.map(m => (
+                          <div key={m.id} className="group flex items-center justify-between p-4 rounded-2xl bg-surface2/30 border border-border/40 hover:border-accent/20 transition-all">
+                             <div className="flex items-center gap-4 min-w-0">
+                                <User size={16} className="text-muted group-hover:text-accent transition-colors" />
+                                <div className="min-w-0">
+                                   <p className="text-sm font-bold text-text truncate">{m.user.display_name || m.user.email}</p>
+                                   <div className="flex items-center gap-2 mt-0.5">
+                                      <span className="text-[9px] font-black text-accent uppercase tracking-[0.2em]">{m.role}</span>
+                                      <span className="w-1 h-1 rounded-full bg-border" />
+                                      <span className="text-[8px] font-dm-mono text-muted tracking-tighter lowercase">{m.user.email}</span>
+                                   </div>
+                                </div>
+                             </div>
+                             <button 
+                                onClick={() => removeMember(m.user.id)}
+                                className="w-9 h-9 flex items-center justify-center rounded-xl bg-accent3/10 text-accent3 opacity-0 group-hover:opacity-100 transition-all hover:bg-accent3 hover:text-background"
+                             >
+                                <Trash2 size={16} />
+                             </button>
+                          </div>
+                       ))}
+                    </div>
+                 </div>
+              </div>
+
+              {/* Action Bar */}
+              <div className="p-8 border-t bg-surface2/40" style={{ borderColor: 'var(--border)' }}>
+                 <div className="flex items-center gap-6">
+                    <div className="flex-1 flex flex-col gap-2">
+                       <label className="text-[9px] font-black text-muted uppercase tracking-[0.2em] pl-1 opacity-50">Operational Proxy</label>
+                       <div className="flex rounded-xl border border-border p-1 bg-surface2">
+                          <button 
+                            onClick={() => setRole('member')}
+                            className={cn(
+                               "flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                               role === 'member' ? "bg-accent text-background shadow-lg" : "text-muted hover:text-text"
+                            )}
+                          > Member
+                          </button>
+                          <button 
+                            onClick={() => setRole('admin')}
+                            className={cn(
+                               "flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                               role === 'admin' ? "bg-accent text-background shadow-lg" : "text-muted hover:text-text"
+                            )}
+                          > Admin
+                          </button>
+                       </div>
+                    </div>
+                    <div className="flex-2 pt-5">
+                       <button 
+                         onClick={addMembers}
+                         disabled={submitting || !selectedIds.length}
+                         className="w-full h-14 bg-accent text-background rounded-2xl font-syne font-bold text-sm tracking-widest uppercase hover:scale-[1.05] active:scale-95 transition-all shadow-lg flex items-center justify-center gap-3 disabled:opacity-30 disabled:scale-100"
+                       >
+                          <span>Connect Nodes</span>
+                          <ArrowRight size={18} />
+                       </button>
+                    </div>
+                 </div>
+              </div>
+           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }

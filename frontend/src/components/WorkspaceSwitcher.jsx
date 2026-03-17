@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { ChevronsUpDown } from "lucide-react";
+import { ChevronDown, Sparkles, Layout } from "lucide-react";
 import { useTenant } from "@/context/TenantContext";
 import { useAuth } from "@/context/AuthContext";
+import { cn } from "@/lib";
 
 export default function WorkspaceSwitcher({ compact = false }) {
   const { tenant, setTenant } = useTenant();
@@ -18,41 +19,45 @@ export default function WorkspaceSwitcher({ compact = false }) {
     if (fromUser.length) setWorkspaces(fromUser);
   }, [user]);
 
-  useEffect(() => {
-    if (!workspaces.length && tenant) {
-      setWorkspaces([{ slug: tenant, name: tenant }]);
-    }
-  }, [tenant, workspaces]);
+  const active = workspaces.find((ws) => ws.slug === tenant) || workspaces[0];
 
   if (compact) {
-    const active = workspaces.find((ws) => ws.slug === tenant) || workspaces[0];
     return (
       <button
-        className="flex h-10 w-full items-center justify-center rounded-xl border border-border/70 bg-card/70 text-xs font-semibold text-foreground transition hover:bg-muted/45"
+        className="w-10 h-10 rounded-xl bg-accent/20 border border-accent/30 flex items-center justify-center font-bold text-xs text-accent transition-all hover:scale-110 active:scale-95 shadow-lg group relative"
         onClick={() => active && setTenant(active.slug)}
         title={active?.name || "Workspace"}
       >
-        {(active?.name || "WS").slice(0, 2).toUpperCase()}
+        <Sparkles size={16} className="group-hover:rotate-12 transition-transform" />
+        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-accent rounded-full border-2 border-background" />
       </button>
     );
   }
 
   return (
-    <div className="space-y-2">
-      <p className="px-2 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Workspace</p>
-      <div className="relative rounded-2xl border border-border/70 bg-card/70 p-1.5">
+    <div className="space-y-2 group">
+      <div className="px-5 flex items-center justify-between">
+         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted opacity-40">System Node</p>
+         <Layout size={12} className="text-muted/30" />
+      </div>
+      
+      <div className="relative mx-2">
         <select
-          className="h-10 w-full appearance-none rounded-xl bg-transparent px-3 pr-9 text-sm text-foreground outline-none transition hover:bg-muted/35"
+          className="w-full h-14 bg-surface2/50 rounded-2xl border border-border pl-5 pr-12 text-sm font-syne font-bold text-text outline-none appearance-none transition-all hover:border-accent group-hover:bg-surface2 cursor-pointer shadow-inner"
           value={tenant || ""}
           onChange={(event) => setTenant(event.target.value)}
         >
           {workspaces.map((ws) => (
-            <option key={ws.slug} value={ws.slug}>
+            <option key={ws.slug} value={ws.slug} className="bg-surface text-text font-bold">
               {ws.name || ws.slug}
             </option>
           ))}
         </select>
-        <ChevronsUpDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none flex flex-col gap-0.5 opacity-40 group-hover:opacity-100 transition-all group-hover:text-accent">
+           <ChevronDown size={14} strokeWidth={3} />
+        </div>
+        
+        <div className="absolute bottom-0 left-5 right-5 h-px bg-gradient-to-r from-transparent via-accent/30 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
       </div>
     </div>
   );

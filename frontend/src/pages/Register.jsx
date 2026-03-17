@@ -1,18 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Sparkles, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
-  const [apiError, setApiError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({
     first_name: "",
@@ -25,20 +21,23 @@ export default function Register() {
     e.preventDefault();
     setLoading(true);
     setErrors({});
-    setApiError("");
+    
     const localErrors = {};
     if (!/[A-Z]/.test(form.password)) {
-      localErrors.password = "Password must include at least one uppercase letter.";
+      localErrors.password = "Need an uppercase letter.";
     } else if (!/\d/.test(form.password)) {
-      localErrors.password = "Password must include at least one digit.";
+      localErrors.password = "Need at least one number.";
     }
+    
     if (Object.keys(localErrors).length) {
       setErrors(localErrors);
       setLoading(false);
       return;
     }
+
     try {
       await register(form);
+      toast.success("Welcome to FlowDesk!");
       navigate("/");
     } catch (error) {
       const detail = error?.response?.data?.detail;
@@ -47,26 +46,9 @@ export default function Register() {
         Object.entries(detail).forEach(([key, value]) => {
           nextErrors[key] = Array.isArray(value) ? value[0] : String(value);
         });
-        if (nextErrors.email?.toLowerCase().includes("already exists")) {
-          nextErrors.email = `${nextErrors.email} Try signing in instead.`;
-        }
-        if (nextErrors.non_field_errors && !nextErrors.password) {
-          nextErrors.password = nextErrors.non_field_errors;
-        }
         setErrors(nextErrors);
-        if (typeof detail?.non_field_errors === "string") {
-          setApiError(detail.non_field_errors);
-        }
-      } else if (Array.isArray(detail) && detail.length) {
-        setErrors({ password: String(detail[0]) });
-        setApiError(String(detail[0]));
-      } else if (typeof detail === "string") {
-        setErrors({ password: detail });
-        setApiError(detail);
       } else {
-        const msg = "Registration failed";
-        setApiError(msg);
-        toast.error(msg);
+        toast.error("Registration failed. Try a different email.");
       }
     } finally {
       setLoading(false);
@@ -74,54 +56,130 @@ export default function Register() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(107,118,145,0.14),transparent)] p-4">
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <CardTitle className="text-2xl">Create account</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={submit} className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Input placeholder="First name" value={form.first_name} onChange={(e) => setForm((p) => ({ ...p, first_name: e.target.value }))} required />
-                {errors.first_name ? <p className="text-xs text-danger-foreground">{errors.first_name}</p> : null}
-              </div>
-              <div className="space-y-1">
-                <Input placeholder="Last name" value={form.last_name} onChange={(e) => setForm((p) => ({ ...p, last_name: e.target.value }))} required />
-                {errors.last_name ? <p className="text-xs text-danger-foreground">{errors.last_name}</p> : null}
-              </div>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 relative overflow-hidden">
+      {/* Background Decor */}
+      <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent/5 rounded-full blur-[120px]" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-accent2/5 rounded-full blur-[120px]" />
+
+      <div className="w-full max-w-[500px] animate-fade-up">
+        <div className="flex flex-col items-center mb-10">
+           <div className="w-16 h-16 bg-accent rounded-3xl flex items-center justify-center shadow-[0_0_30px_rgba(0,229,192,0.3)] mb-6">
+              <Sparkles className="w-8 h-8 text-background" />
+           </div>
+           <h1 className="text-text font-syne font-bold text-4xl tracking-tighter uppercase">FlowDesk</h1>
+           <p className="text-muted text-xs font-dm-mono mt-2 uppercase tracking-[0.3em]">Join the future of workflow</p>
+        </div>
+
+        <div 
+          className="rounded-[2.5rem] border p-10 shadow-2xl relative overflow-hidden group"
+          style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+        >
+          {/* Subtle Inner Glow */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/30 to-transparent" />
+          
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <h2 className="text-text font-syne font-bold text-2xl tracking-tight">Create Account</h2>
+              <p className="text-muted text-sm mt-1">Start your 14-day pro trial.</p>
             </div>
-            <Input type="email" placeholder="Email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} required />
-            {errors.email ? <p className="text-xs text-danger-foreground">{errors.email}</p> : null}
-            <div className="relative">
-              <Input
-                type={showPassword ? "text" : "password"}
-                placeholder="Password"
-                value={form.password}
-                onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                className="pr-10"
-                required
-              />
-              <button
-                type="button"
-                aria-label="Toggle password visibility"
-                onClick={() => setShowPassword((value) => !value)}
-                className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/40"
+            <div className="w-12 h-12 rounded-2xl bg-surface2 border border-border flex items-center justify-center">
+               <UserPlus className="w-6 h-6 text-accent" />
+            </div>
+          </div>
+
+          <form onSubmit={submit} className="space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-muted uppercase tracking-widest pl-1">First Name</label>
+                  <input 
+                     placeholder="John"
+                     className={`w-full h-12 bg-surface2 rounded-xl border px-4 text-sm transition-all focus:border-accent focus:outline-none text-text ${
+                       errors.first_name ? 'border-accent3' : 'border-border'
+                     }`}
+                     value={form.first_name}
+                     onChange={(e) => setForm(p => ({ ...p, first_name: e.target.value }))}
+                     required
+                  />
+               </div>
+               <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-muted uppercase tracking-widest pl-1">Last Name</label>
+                  <input 
+                     placeholder="Doe"
+                     className={`w-full h-12 bg-surface2 rounded-xl border px-4 text-sm transition-all focus:border-accent focus:outline-none text-text ${
+                       errors.last_name ? 'border-accent3' : 'border-border'
+                     }`}
+                     value={form.last_name}
+                     onChange={(e) => setForm(p => ({ ...p, last_name: e.target.value }))}
+                     required
+                  />
+               </div>
+            </div>
+
+            <div className="space-y-2">
+               <label className="text-[10px] font-bold text-muted uppercase tracking-widest pl-1">Work Email</label>
+               <input 
+                  type="email"
+                  placeholder="name@company.com"
+                  className={`w-full h-12 bg-surface2 rounded-xl border px-4 text-sm transition-all focus:border-accent focus:outline-none text-text ${
+                    errors.email ? 'border-accent3' : 'border-border'
+                  }`}
+                  value={form.email}
+                  onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))}
+                  required
+               />
+               {errors.email && <p className="text-[10px] text-accent3 font-bold px-1">{errors.email}</p>}
+            </div>
+
+            <div className="space-y-2">
+               <label className="text-[10px] font-bold text-muted uppercase tracking-widest pl-1">Secure Password</label>
+               <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    className={`w-full h-12 bg-surface2 rounded-xl border px-4 text-sm transition-all focus:border-accent focus:outline-none text-text ${
+                      errors.password ? 'border-accent3' : 'border-border'
+                    }`}
+                    value={form.password}
+                    onChange={(e) => setForm(p => ({ ...p, password: e.target.value }))}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted hover:text-text transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+               </div>
+               {errors.password && <p className="text-[10px] text-accent3 font-bold px-1">{errors.password}</p>}
+            </div>
+
+            <div className="pt-4">
+              <button 
+                className="w-full h-14 bg-accent text-background rounded-2xl font-syne font-bold text-sm tracking-widest uppercase hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_10px_30px_rgba(0,229,192,0.2)] flex items-center justify-center gap-2"
+                disabled={loading}
               >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {loading ? <Loader2 className="w-6 h-6 animate-spin text-background" /> : (
+                  <>
+                    <span>Initialize Account</span>
+                    <Sparkles className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </div>
-            {errors.password ? <p className="text-xs text-danger-foreground">{errors.password}</p> : null}
-            {apiError ? <p className="text-xs text-danger-foreground">{apiError}</p> : null}
-            <Button className="w-full" disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create account"}
-            </Button>
           </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Already registered? <Link to="/login" className="text-primary">Sign in</Link>
-          </p>
-        </CardContent>
-      </Card>
+
+          <div className="mt-10 pt-8 border-t border-border/50 text-center">
+             <p className="text-muted text-xs">
+                Already have an account? <Link to="/login" className="text-accent font-bold hover:underline">Sign In Instead</Link>
+             </p>
+          </div>
+        </div>
+        
+        <p className="text-center text-[10px] text-muted-foreground/30 mt-8 uppercase tracking-[0.2em]">
+           By clicking initialize, you agree to our Terms of Service.
+        </p>
+      </div>
     </div>
   );
 }

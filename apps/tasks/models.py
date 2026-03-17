@@ -44,7 +44,7 @@ class Task(UUIDModel, TimeStampedModel, TenantScopedModel):
         ]
         constraints = [
             models.CheckConstraint(
-                check=models.Q(progress_percent__gte=0) & models.Q(progress_percent__lte=100),
+                condition=models.Q(progress_percent__gte=0) & models.Q(progress_percent__lte=100),
                 name="tasks_task_progress_percent_0_100",
             ),
         ]
@@ -121,3 +121,4 @@ class TaskActivity(UUIDModel):
     class Meta:
         ordering = ["-created_at"]
         indexes = [models.Index(fields=["tenant", "task", "created_at"])]
+

@@ -1,28 +1,23 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({});
-  const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
     const nextErrors = {};
-    if (!form.email) nextErrors.email = "This field is required";
-    if (!form.password) nextErrors.password = "This field is required";
+    if (!form.email) nextErrors.email = "Required";
+    if (!form.password) nextErrors.password = "Required";
     setErrors(nextErrors);
-    setApiError("");
     if (Object.keys(nextErrors).length) return;
 
     setLoading(true);
@@ -30,76 +25,90 @@ export default function Login() {
       await login(form);
       navigate("/");
     } catch (error) {
-      const detail = error?.response?.data?.detail;
-      if (detail && typeof detail === "object" && !Array.isArray(detail)) {
-        const fieldErrors = {};
-        Object.entries(detail).forEach(([key, value]) => {
-          fieldErrors[key] = Array.isArray(value) ? value[0] : String(value);
-        });
-        const fallback =
-          fieldErrors.non_field_errors ||
-          fieldErrors.detail ||
-          fieldErrors.password ||
-          "Invalid credentials";
-        setErrors({
-          email: fieldErrors.email || "",
-          password: fieldErrors.password || fallback
-        });
-        setApiError(fallback);
-      } else if (Array.isArray(detail) && detail.length) {
-        setErrors({ password: String(detail[0]) });
-        setApiError(String(detail[0]));
-      } else if (typeof detail === "string") {
-        setErrors({ password: detail });
-        setApiError(detail);
-      } else {
-        setErrors({ password: "Invalid credentials" });
-        toast.error("Login failed");
-      }
+       toast.error("Invalid credentials. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(107,118,145,0.14),transparent)] p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl">Welcome back</CardTitle>
-          <p className="text-sm text-muted-foreground">Sign in to your workspace</p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={submit} className="space-y-3">
-            <Input type="email" placeholder="Email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} className={errors.email ? "border-danger/70" : ""} />
-            {errors.email ? <p className="text-xs text-danger-foreground">{errors.email}</p> : null}
-            <div className="relative">
-              <Input
-                type={showPassword ? "text" : "password"}
-                placeholder="Password"
-                value={form.password}
-                onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                className={errors.password ? "border-danger/70 pr-10" : "pr-10"}
-              />
-              <button
-                type="button"
-                aria-label="Toggle password visibility"
-                onClick={() => setShowPassword((value) => !value)}
-                className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/40"
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 relative overflow-hidden">
+      {/* Background Decor */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-accent/5 rounded-full blur-[120px]" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent2/5 rounded-full blur-[120px]" />
+
+      <div className="w-full max-w-[440px] animate-fade-up">
+        <div className="flex flex-col items-center mb-10">
+           <div className="w-16 h-16 bg-accent rounded-3xl flex items-center justify-center shadow-[0_0_30px_rgba(0,229,192,0.3)] mb-6">
+              <Sparkles className="w-8 h-8 text-background" />
+           </div>
+           <h1 className="text-text font-syne font-bold text-4xl tracking-tighter">FLOWDESK</h1>
+           <p className="text-muted text-xs font-dm-mono mt-2 uppercase tracking-[0.3em]">Streamline your workflow</p>
+        </div>
+
+        <div 
+          className="rounded-[2.5rem] border p-10 shadow-2xl relative overflow-hidden group"
+          style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+        >
+          {/* Subtle Inner Glow */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/30 to-transparent" />
+          
+          <div className="mb-8">
+            <h2 className="text-text font-syne font-bold text-2xl tracking-tight">Welcome Back</h2>
+            <p className="text-muted text-sm mt-1">Access your team workspace.</p>
+          </div>
+
+          <form onSubmit={submit} className="space-y-6">
+            <div className="space-y-2">
+               <label className="text-[10px] font-bold text-muted uppercase tracking-widest pl-1">Email Address</label>
+               <input 
+                  type="email"
+                  placeholder="name@company.com"
+                  className={`w-full h-14 bg-surface2 rounded-2xl border px-5 text-sm transition-all focus:border-accent focus:outline-none text-text ${
+                    errors.email ? 'border-accent3' : 'border-border'
+                  }`}
+                  value={form.email}
+                  onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))}
+               />
             </div>
-            {errors.password ? <p className="text-xs text-danger-foreground">{errors.password}</p> : null}
-            {apiError ? <p className="text-xs text-danger-foreground">{apiError}</p> : null}
-            <Button className="w-full" disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
-            </Button>
+
+            <div className="space-y-2">
+               <label className="text-[10px] font-bold text-muted uppercase tracking-widest pl-1">Secret Password</label>
+               <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    className={`w-full h-14 bg-surface2 rounded-2xl border px-5 text-sm transition-all focus:border-accent focus:outline-none text-text ${
+                      errors.password ? 'border-accent3' : 'border-border'
+                    }`}
+                    value={form.password}
+                    onChange={(e) => setForm(p => ({ ...p, password: e.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted hover:text-text transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+               </div>
+            </div>
+
+            <button 
+               className="w-full h-14 bg-accent text-background rounded-2xl font-syne font-bold text-sm tracking-widest uppercase hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_10px_30px_rgba(0,229,192,0.2)]"
+               disabled={loading}
+            >
+               {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto text-background" /> : "Authorize Access"}
+            </button>
           </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            No account? <Link className="text-primary" to="/register">Create one</Link>
-          </p>
-        </CardContent>
-      </Card>
+
+          <div className="mt-10 pt-8 border-t border-border/50 text-center">
+             <p className="text-muted text-xs">
+                New to the platform? <Link to="/register" className="text-accent font-bold hover:underline">Create Account</Link>
+             </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

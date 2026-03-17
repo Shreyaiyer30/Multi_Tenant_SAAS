@@ -64,7 +64,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='task',
-            constraint=models.CheckConstraint(check=models.Q(('progress_percent__gte', 0), ('progress_percent__lte', 100)), name='tasks_task_progress_percent_0_100'),
+            constraint=models.CheckConstraint(condition=models.Q(('progress_percent__gte', 0), ('progress_percent__lte', 100)), name='tasks_task_progress_percent_0_100'),
         ),
         migrations.AddField(
             model_name='taskactivity',
@@ -86,3 +86,4 @@ class Migration(migrations.Migration):
             index=models.Index(fields=['tenant', 'task', 'created_at'], name='tasks_taska_tenant__f69e36_idx'),
         ),
     ]
+

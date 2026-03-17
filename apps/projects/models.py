@@ -30,7 +30,7 @@ class Project(UUIDModel, TimeStampedModel, TenantScopedModel):
         ]
         constraints = [
             models.CheckConstraint(
-                check=models.Q(completion_percent__gte=0) & models.Q(completion_percent__lte=100),
+                condition=models.Q(completion_percent__gte=0) & models.Q(completion_percent__lte=100),
                 name="projects_project_completion_percent_0_100",
             ),
         ]
@@ -62,3 +62,4 @@ class ProjectMember(UUIDModel, TimeStampedModel):
             models.Index(fields=["tenant", "project"]),
             models.Index(fields=["tenant", "user"]),
         ]
+

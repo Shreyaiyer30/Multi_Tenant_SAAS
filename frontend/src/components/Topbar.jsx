@@ -3,8 +3,18 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib";
 import { useAuth } from "@/context/AuthContext";
 import { useTenant } from "@/context/TenantContext";
+import { 
+  Search, 
+  Bell, 
+  Menu, 
+  Command, 
+  ChevronRight, 
+  Check, 
+  Clock, 
+  AlertCircle,
+  Hash
+} from "lucide-react";
 
-// Reuse the custom hook logic or define here if needed for dropdowns
 const useOutsideClick = (callback) => {
   const ref = useRef();
   useEffect(() => {
@@ -18,20 +28,23 @@ const useOutsideClick = (callback) => {
 };
 
 const topbarBreadcrumbs = {
-   "/dashboard": ["Workspace", "Insight", "Dashboard"],
-   "/projects": ["Workspace", "Task Management", "Projects"],
-   "/tasks": ["Workspace", "Task Management", "Tasks"],
-   "/members": ["Team", "Organization", "Members"],
-   "/reports": ["Insights", "Performance", "Reports"],
+   "/dashboard": ["Workspace", "Task Management", "Dashboard"],
+   "/projects": ["Workspace", "Team Ops", "Projects"],
+   "/tasks": ["Workspace", "Node Flow", "Tasks"],
+   "/members": ["Network", "Directory", "Members"],
+   "/reports": ["Insights", "Analytics", "Reports"],
+   "/billing": ["Invoicing", "Subscription", "Billing"],
+   "/notifications": ["System", "Events", "Notifications"],
 };
 
-export default function Topbar({ timeRange, setTimeRange, onToggleMobileSidebar }) {
+export default function Topbar({ timeRange, setTimeRange, onToggleMobileSidebar, collapsed }) {
   const { user } = useAuth();
   const { tenant } = useTenant();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [unreadNotifications, setUnreadNotifications] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(1);
   
   const notificationsRef = useOutsideClick(() => setIsNotificationsOpen(false));
   const paletteRef = useOutsideClick(() => setIsCommandPaletteOpen(false));
@@ -39,7 +52,6 @@ export default function Topbar({ timeRange, setTimeRange, onToggleMobileSidebar 
   const path = location.pathname;
   const crumbs = topbarBreadcrumbs[path] || ["Workspace", "Task Management", "Dashboard"];
 
-  // Keyboard shortcut for Command Palette
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -54,49 +66,68 @@ export default function Topbar({ timeRange, setTimeRange, onToggleMobileSidebar 
 
   return (
     <>
-      <header className="h-[58px] flex items-center justify-between px-6 border-b sticky top-0 shrink-0 z-40" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}>
-        {/* Left: Breadcrumb / Mobile Menu Toggle */}
-        <div className="flex items-center gap-4">
-           <button onClick={onToggleMobileSidebar} className="lg:hidden p-2 -ml-2 hover:bg-surface2 rounded-lg transition-colors">
-              <span className="text-xl">☰</span>
+      <header 
+        className="h-14 flex items-center justify-between px-6 border-b sticky top-0 shrink-0 z-40 bg-background/90 backdrop-blur-md" 
+        style={{ borderColor: 'rgba(26, 45, 68, 0.5)' }}
+      >
+        {/* Left: Breadcrumb */}
+        <div className="flex items-center gap-6">
+           <button 
+             onClick={onToggleMobileSidebar} 
+             className="lg:hidden text-muted hover:text-accent transition-all"
+           >
+              <Menu size={18} />
            </button>
-           <div className="hidden sm:flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider">
-             <span className="text-muted cursor-pointer hover:text-white transition-colors">{crumbs[0]}</span>
-             <span className="text-muted opacity-40">/</span>
-             <span className="text-muted cursor-pointer hover:text-white transition-colors">{crumbs[1]}</span>
-             <span className="text-muted opacity-40">/</span>
-             <span className="text-text">{crumbs[2]}</span>
+           
+           <div className="hidden sm:flex items-center gap-2">
+              {crumbs.map((crumb, i) => (
+                <div key={i} className="flex items-center gap-2">
+                   <span className={cn(
+                     "text-[10px] tracking-tight font-dm-mono uppercase",
+                     i === crumbs.length - 1 ? "text-text font-black" : "text-muted opacity-60 font-medium"
+                   )}>
+                      {crumb}
+                   </span>
+                   {i < crumbs.length - 1 && (
+                     <span className="text-muted/30 text-[10px]">›</span>
+                   )}
+                </div>
+              ))}
            </div>
         </div>
 
-        {/* Center: Search / Command Palette Trigger */}
+        {/* Center: Search */}
         <div className="flex-1 max-w-md mx-8 hidden lg:block">
            <div 
              onClick={() => setIsCommandPaletteOpen(true)}
-             className="flex items-center justify-between h-9 px-4 rounded-full border cursor-pointer hover:border-accent transition-all group"
-             style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+             className="flex items-center justify-between h-9 px-4 rounded-full border border-border/40 bg-surface/40 hover:border-accent/30 transition-all group cursor-pointer"
            >
              <div className="flex items-center gap-3">
-               <span className="text-muted group-hover:text-accent transition-colors">🔍</span>
-               <span className="text-muted text-xs">Search anything...</span>
+               <Search size={14} className="text-muted/50 group-hover:text-accent/60 transition-colors" />
+               <span className="text-muted/40 text-xs font-dm-mono lowercase tracking-tight">Search...</span>
              </div>
-             <kbd className="px-1.5 py-0.5 rounded border border-border bg-surface2 text-[10px] text-muted font-mono leading-none">⌘K</kbd>
+             <div className="flex items-center gap-1 opacity-20 group-hover:opacity-60 transition-opacity">
+                <Command size={10} />
+                <span className="text-[10px] font-black">K</span>
+             </div>
            </div>
         </div>
 
         {/* Right: Actions */}
         <div className="flex items-center gap-4">
-          <div className="flex rounded-lg border p-1" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
+          <div className="flex bg-surface2/30 p-1 rounded-lg border border-border/30">
             {['7d', '30d', '90d'].map((range) => (
               <button
                 key={range}
                 onClick={() => setTimeRange(range)}
                 className={cn(
-                  "px-3 py-1 rounded-md text-[10px] font-bold transition-all",
-                  timeRange === range ? "bg-accent text-background" : "text-muted hover:text-white"
+                  "px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-tight transition-all",
+                  timeRange === range 
+                    ? "bg-accent text-background shadow-lg" 
+                    : "text-muted hover:text-text"
                 )}
               >
-                {range.toUpperCase()}
+                {range}
               </button>
             ))}
           </div>
@@ -104,49 +135,55 @@ export default function Topbar({ timeRange, setTimeRange, onToggleMobileSidebar 
           <div className="relative" ref={notificationsRef}>
              <button 
                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-               className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface2 transition-all relative border"
-               style={{ borderColor: 'var(--border)' }}
+               className={cn(
+                 "w-9 h-9 flex items-center justify-center rounded-lg border border-border/30 transition-all relative ring-inset",
+                 isNotificationsOpen ? "bg-accent/10 border-accent/40 text-accent" : "bg-surface2/30 text-muted hover:text-accent hover:border-accent/20"
+               )}
              >
-                <span className="text-lg">🔔</span>
-                {unreadNotifications && <div className="absolute top-2 right-2.5 w-2 h-2 rounded-full border-2 border-background bg-accent3" />}
+                <Bell size={16} />
+                {unreadCount > 0 && (
+                  <div className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-accent4 border-2 border-background animate-pulse" />
+                )}
              </button>
 
              {isNotificationsOpen && (
-                <div className="absolute right-0 mt-3 w-80 rounded-2xl border shadow-2xl overflow-hidden z-[100] animate-fade-up" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
-                   <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border)' }}>
-                      <h4 className="font-syne font-bold text-text">Notifications</h4>
-                      <button onClick={() => setUnreadNotifications(false)} className="text-[10px] font-bold text-accent hover:underline">Mark all read</button>
+                <div 
+                  className="absolute right-0 mt-3 w-80 rounded-2xl border border-border/50 shadow-2xl overflow-hidden z-[100] animate-fade-up bg-surface/95 backdrop-blur-xl"
+                >
+                   <div className="p-4 border-b border-border/50 flex items-center justify-between">
+                      <h4 className="font-syne font-bold text-text text-sm uppercase tracking-tight">Recent Activity</h4>
+                      <span className="text-[8px] font-black bg-accent text-background px-1.5 py-0.5 rounded uppercase tracking-widest">{unreadCount} New</span>
                    </div>
+                   
                    <div className="max-h-80 overflow-y-auto custom-scrollbar">
-                      <div className="p-4 hover:bg-surface2 transition-colors cursor-pointer border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
-                         <div className="flex gap-3">
-                           <div className="w-2 h-2 rounded-full bg-accent mt-1.5 shrink-0" />
-                           <div>
-                              <p className="text-xs text-text leading-tight">Arjun mentioned you in task <span className="text-accent2">#24 - Navbar Fix</span></p>
-                              <span className="text-[10px] text-muted mt-1 block">5m ago</span>
+                      {[
+                        { title: 'Task Assigned', desc: 'Arjun assigned a task: Navbar Fix', time: '12m' },
+                        { title: 'Status Update', desc: 'Front-end sync completed successfully', time: '1h' },
+                      ].map((n, i) => (
+                        <div key={i} className="p-4 hover:bg-surface2/50 transition-all cursor-pointer border-b border-border/30 last:border-0 group">
+                           <div className="flex justify-between items-start mb-1">
+                              <h5 className="text-[10px] font-bold text-text uppercase tracking-tight group-hover:text-accent transition-colors">{n.title}</h5>
+                              <span className="text-[9px] font-dm-mono opacity-40">{n.time}</span>
                            </div>
-                         </div>
-                      </div>
-                      <div className="p-4 hover:bg-surface2 transition-colors cursor-pointer border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
-                         <div className="flex gap-3 pl-5">
-                           <div>
-                              <p className="text-xs text-text leading-tight">Project <span className="text-accent4">FlowDesk v2</span> reached 80% completion</p>
-                              <span className="text-[10px] text-muted mt-1 block">2h ago</span>
-                           </div>
-                         </div>
-                      </div>
+                           <p className="text-[11px] text-muted leading-tight">{n.desc}</p>
+                        </div>
+                      ))}
                    </div>
+
+                   <button 
+                      onClick={() => { setIsNotificationsOpen(false); navigate('/notifications'); }}
+                      className="w-full py-3 text-[9px] font-black text-muted uppercase tracking-[0.2em] hover:text-accent hover:bg-surface2 transition-all border-t border-border/50"
+                    >
+                      Audit Trail
+                    </button>
                 </div>
              )}
           </div>
 
           <div 
-            className="w-9 h-9 rounded-full border p-0.5" 
-            style={{ borderColor: 'var(--border)', background: 'linear-gradient(135deg, var(--accent2), var(--accent5))' }}
+            className="w-10 h-10 rounded-full flex items-center justify-center font-black text-[10px] bg-accent text-background shadow-lg rotate-0 hover:scale-105 active:scale-95 transition-all cursor-pointer"
           >
-            <div className="w-full h-full rounded-full bg-background flex items-center justify-center font-bold text-[10px] text-text">
-               {(user?.display_name?.[0] || user?.email?.[0] || 'U').toUpperCase()}
-            </div>
+             {(user?.display_name || "SI").slice(0, 2).toUpperCase()}
           </div>
         </div>
       </header>
@@ -154,49 +191,55 @@ export default function Topbar({ timeRange, setTimeRange, onToggleMobileSidebar 
       {/* Command Palette Modal */}
       {isCommandPaletteOpen && (
         <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md bg-background/80"
-          style={{ animation: 'fadeIn 0.2s ease-out' }}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md bg-background/60"
         >
           <div 
             ref={paletteRef}
-            className="w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden animate-fade-up"
-            style={{ backgroundColor: 'var(--surface2)', borderColor: 'var(--border)' }}
+            className="w-full max-w-xl rounded-3xl border border-border/50 shadow-2xl overflow-hidden animate-fade-up bg-surface/95 backdrop-blur-2xl"
           >
-            <div className="relative border-b" style={{ borderColor: 'var(--border)' }}>
-               <span className="absolute left-6 top-1/2 -translate-y-1/2 text-xl opacity-50">🔍</span>
+            <div className="relative border-b border-border/30">
+               <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-muted opacity-40" size={20} />
                <input 
                  autoFocus
-                 placeholder="Search dashboard, projects, team..."
-                 className="w-full h-16 bg-transparent px-16 text-lg focus:outline-none placeholder:text-muted font-medium text-text font-syne"
+                 placeholder="Search terminal..."
+                 className="w-full h-16 bg-transparent px-16 text-lg focus:outline-none placeholder:text-muted/20 font-syne font-medium text-text"
                />
+               <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-20 pointer-events-none">
+                  <span className="text-xs font-bold">⌘</span>
+                  <span className="text-xs font-bold uppercase tracking-widest">K</span>
+               </div>
             </div>
-            <div className="p-4 max-h-[400px] overflow-y-auto">
-               <div className="px-4 py-2 text-[10px] font-bold text-muted uppercase tracking-widest">Recent</div>
+            
+            <div className="p-6 max-h-96 overflow-y-auto custom-scrollbar">
+               <div className="px-4 text-[9px] font-black text-muted uppercase tracking-widest mb-4 opacity-40">Frequency History</div>
                <div className="space-y-1">
                  {[
-                   { label: 'Project: Nebula SaaS', icon: '📁', sub: 'Last edited 2h ago' },
-                   { label: 'Team Members', icon: '👥', sub: '3 active now' },
-                   { label: 'Dashboard Overview', icon: '◰', sub: 'Insights' },
-                 ].map((item) => (
-                   <div key={item.label} className="flex items-center justify-between p-3 rounded-xl hover:bg-surface transition-all cursor-pointer group">
+                   { label: 'Project: FlowDesk UI', type: 'Node' },
+                   { label: 'Member: Sarah Chen', type: 'Entity' },
+                   { label: 'Task: API Deployment', type: 'Flow' },
+                 ].map((item, idx) => (
+                   <div key={idx} className="flex items-center justify-between p-3 rounded-xl hover:bg-surface2/50 transition-all cursor-pointer group">
                       <div className="flex items-center gap-4">
-                        <span className="text-xl w-6 text-center">{item.icon}</span>
+                        <div className="w-8 h-8 rounded-lg bg-surface2 border border-border/30 flex items-center justify-center text-muted group-hover:text-accent transition-colors">
+                           <Hash size={14} />
+                        </div>
                         <div>
-                          <p className="font-syne font-semibold text-text">{item.label}</p>
-                          <p className="text-[10px] text-muted">{item.sub}</p>
+                          <p className="text-sm font-bold text-text/80 group-hover:text-accent transition-colors">{item.label}</p>
+                          <p className="text-[9px] font-black text-muted uppercase tracking-widest">{item.type}</p>
                         </div>
                       </div>
-                      <span className="text-xs text-muted opacity-0 group-hover:opacity-100 italic transition-opacity">↵ Navigate</span>
+                      <ChevronRight size={14} className="text-muted/20 group-hover:text-accent/40 translate-x-2 group-hover:translate-x-0 transition-all opacity-0 group-hover:opacity-100" />
                    </div>
                  ))}
                </div>
             </div>
-            <div className="p-4 border-t flex items-center justify-between" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}>
+            
+            <div className="px-6 py-3 border-t border-border/30 flex items-center justify-between opacity-40">
                <div className="flex gap-4">
-                  <span className="text-[10px] text-muted"><kbd className="px-1 py-0.5 rounded bg-surface2 border border-border">↑↓</kbd> Select</span>
-                  <span className="text-[10px] text-muted"><kbd className="px-1 py-0.5 rounded bg-surface2 border border-border">↵</kbd> Open</span>
+                  <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded border border-border text-[8px] font-black">↑↓</div>
+                  <span className="text-[9px] font-black uppercase tracking-widest">Navigate</span>
                </div>
-               <span className="text-[10px] text-muted">Press ESC to dismiss</span>
+               <div className="text-[9px] font-black uppercase tracking-widest">FlowDesk terminal v2.4</div>
             </div>
           </div>
         </div>
@@ -204,4 +247,3 @@ export default function Topbar({ timeRange, setTimeRange, onToggleMobileSidebar 
     </>
   );
 }
-
