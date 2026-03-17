@@ -12,18 +12,30 @@ export default function Notifications() {
   const { tenant } = useTenant();
   const navigate = useNavigate();
 
+  const broadcastUnreadCount = (nextItems, fallbackUnreadCount = null) => {
+    const unread_count =
+      typeof fallbackUnreadCount === "number"
+        ? fallbackUnreadCount
+        : nextItems.filter((item) => !item.is_read).length;
+    window.dispatchEvent(new CustomEvent("notifications-updated", { detail: { unread_count } }));
+  };
+
   const load = async () => {
     if (!tenant) {
       setItems([]);
+      broadcastUnreadCount([], 0);
       return;
     }
 
     setLoading(true);
     try {
       const { data } = await api.get("notifications/");
-      setItems(data.results || []);
+      const results = data.results || [];
+      setItems(results);
+      broadcastUnreadCount(results, Number(data?.unread_count ?? 0));
     } catch {
       setItems([]);
+      broadcastUnreadCount([], 0);
     } finally {
       setLoading(false);
     }
@@ -39,7 +51,11 @@ export default function Notifications() {
         return;
       }
       await api.post("notifications/mark-read/", { ids: [id] });
-      setItems((prev) => prev.map((it) => (it.id === id ? { ...it, is_read: true } : it)));
+      setItems((prev) => {
+        const next = prev.map((it) => (it.id === id ? { ...it, is_read: true } : it));
+        broadcastUnreadCount(next);
+        return next;
+      });
     } catch {
       // no-op to keep list stable
     }
@@ -48,7 +64,11 @@ export default function Notifications() {
   const markAllRead = async () => {
     try {
       await api.post("notifications/mark-all-read/");
-      setItems((prev) => prev.map((it) => ({ ...it, is_read: true })));
+      setItems((prev) => {
+        const next = prev.map((it) => ({ ...it, is_read: true }));
+        broadcastUnreadCount(next, 0);
+        return next;
+      });
     } catch {
       // no-op to keep list stable
     }

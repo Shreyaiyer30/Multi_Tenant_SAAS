@@ -26,6 +26,7 @@ function RouteFallback() {
 
 function ProtectedLayout() {
   const location = useLocation();
+  const [timeRange, setTimeRange] = useState("7d");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("sidebarCollapsed") === "true";
@@ -43,7 +44,7 @@ function ProtectedLayout() {
   return (
     <div
       className="min-h-screen bg-background lg:grid lg:transition-[grid-template-columns] lg:duration-300"
-      style={{ gridTemplateColumns: sidebarCollapsed ? "72px 1fr" : "260px 1fr" }}
+      style={{ gridTemplateColumns: sidebarCollapsed ? "60px 1fr" : "240px 1fr" }}
     >
       <Sidebar
         collapsed={sidebarCollapsed}
@@ -51,13 +52,15 @@ function ProtectedLayout() {
         mobileOpen={mobileSidebarOpen}
         onMobileOpenChange={setMobileSidebarOpen}
       />
-      <main className="min-w-0 overflow-x-hidden">
+      <main className="min-w-0 flex flex-col h-screen overflow-hidden">
         <Topbar
+          timeRange={timeRange}
+          setTimeRange={setTimeRange}
           collapsed={sidebarCollapsed}
           onToggleMobileSidebar={() => setMobileSidebarOpen((value) => !value)}
         />
-        <div className="page-enter mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 md:py-6 lg:px-8">
-          <Outlet />
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <Outlet context={{ timeRange, setTimeRange }} />
         </div>
       </main>
     </div>

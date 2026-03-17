@@ -19,10 +19,10 @@ def _candidate_handles(user):
     email_local = email.split("@", 1)[0] if email else ""
 
     candidates = [
-        getattr(user, "display_name", ""),
+        email_local,
         getattr(user, "first_name", ""),
         f"{getattr(user, 'first_name', '')}{getattr(user, 'last_name', '')}",
-        email_local,
+        getattr(user, "display_name", ""),
     ]
 
     handles = []
@@ -54,9 +54,7 @@ def _workspace_handle_lookup(workspace):
     return lookup
 
 
-def resolve_mentioned_users(workspace, comment_text, explicit_user_ids=None):
-    explicit_user_ids = explicit_user_ids if isinstance(explicit_user_ids, list) else []
-
+def resolve_mentioned_users(workspace, comment_text):
     ordered_ids = []
     seen = set()
 
@@ -66,13 +64,6 @@ def resolve_mentioned_users(workspace, comment_text, explicit_user_ids=None):
         if user and user.id not in seen:
             seen.add(user.id)
             ordered_ids.append(user.id)
-
-    if explicit_user_ids:
-        explicit_members = Membership.objects.filter(tenant=workspace, user_id__in=explicit_user_ids)
-        for user_id in explicit_members.values_list("user_id", flat=True):
-            if user_id not in seen:
-                seen.add(user_id)
-                ordered_ids.append(user_id)
 
     if not ordered_ids:
         return []

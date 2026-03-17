@@ -16,11 +16,13 @@ class TaskModuleTests(APITestCase):
     def setUp(self):
         self.owner = User.objects.create_user(email="owner@x.com", password="StrongPass1")
         self.member = User.objects.create_user(email="member@x.com", password="StrongPass1")
-        self.outsider = User.objects.create_user(email="member@outside.com", password="StrongPass1")
+        self.viewer = User.objects.create_user(email="viewer@x.com", password="StrongPass1")
+        self.outsider = User.objects.create_user(email="outside@outside.com", password="StrongPass1")
         self.tenant = Tenant.objects.create(name="Acme", slug="acme")
         self.other_tenant = Tenant.objects.create(name="Other", slug="other")
         Membership.objects.create(tenant=self.tenant, user=self.owner, role=Membership.Role.OWNER)
         Membership.objects.create(tenant=self.tenant, user=self.member, role=Membership.Role.MEMBER)
+        Membership.objects.create(tenant=self.tenant, user=self.viewer, role=Membership.Role.MEMBER)
         Membership.objects.create(tenant=self.other_tenant, user=self.outsider, role=Membership.Role.MEMBER)
         self.project = Project.objects.create(tenant=self.tenant, name="P1", description="", color="#6366F1", created_by=self.owner)
         ProjectMember.objects.create(tenant=self.tenant, project=self.project, user=self.owner, role=ProjectMember.Role.ADMIN)
@@ -59,7 +61,7 @@ class TaskModuleTests(APITestCase):
         task = Task.objects.create(tenant=self.tenant, project=self.project, title="T", description="", created_by=self.owner, assignee=self.member)
         create_res = self.client.post(
             reverse("task-comments", kwargs={"pk": task.id}),
-            {"body": "hello @member and @outside", "mentions": [str(self.member.id), str(self.outsider.id)]},
+            {"body": "hello @member and @outside"},
             format="json",
             HTTP_X_TENANT=self.tenant.slug,
         )
@@ -78,3 +80,37 @@ class TaskModuleTests(APITestCase):
             ).exists()
         )
         self.assertFalse(Notification.objects.filter(workspace=self.tenant, user=self.outsider, type="mention").exists())
+
+    def test_mentioned_user_can_view_task_and_mentioned_comments_within_tenant(self):
+        task = Task.objects.create(
+            tenant=self.tenant,
+            project=self.project,
+            title="Mention visibility task",
+            description="",
+            created_by=self.owner,
+            assignee=self.member,
+        )
+        Comment.objects.create(
+            tenant=self.tenant,
+            task=task,
+            author=self.owner,
+            body="private note",
+            mentions=[],
+        )
+        self.client.post(
+            reverse("task-comments", kwargs={"pk": task.id}),
+            {"body": "please review this @viewer"},
+            format="json",
+            HTTP_X_TENANT=self.tenant.slug,
+        )
+
+        viewer_token = RefreshToken.for_user(self.viewer)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {viewer_token.access_token}")
+
+        task_res = self.client.get(reverse("task-detail", kwargs={"pk": task.id}), HTTP_X_TENANT=self.tenant.slug)
+        self.assertEqual(task_res.status_code, status.HTTP_200_OK)
+
+        comments_res = self.client.get(reverse("task-comments", kwargs={"pk": task.id}), HTTP_X_TENANT=self.tenant.slug)
+        self.assertEqual(comments_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(comments_res.data), 1)
+        self.assertIn("@viewer", comments_res.data[0]["body"])

@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from apps.common.mixins import TenantScopedQuerysetMixin
 from apps.common.permissions import IsResourceOwnerOrTenantAdmin, IsTenantAdminOrOwner, IsTenantMember
 from apps.notifications.services import notify_users
+from apps.projects.models import ProjectMember
 from apps.tasks.mentions import resolve_mentioned_users
 from apps.tasks.models import Comment, Notification, Task, TaskActivity
 from apps.tasks.serializers import CommentSerializer, NotificationSerializer, TaskSerializer
@@ -25,6 +26,18 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         membership = getattr(request, "membership", None)
         return bool(membership and membership.role in {"admin", "owner"})
 
+    @staticmethod
+    def _mentioned_task_ids_for_user(tenant, user):
+        user_id = str(user.id)
+        mentioned_task_ids = set()
+        comment_rows = Comment.objects.filter(tenant=tenant).values_list("task_id", "mentions")
+        for task_id, mentions in comment_rows:
+            mention_values = mentions if isinstance(mentions, list) else []
+            normalized = {str(item) for item in mention_values}
+            if user_id in normalized:
+                mentioned_task_ids.add(task_id)
+        return list(mentioned_task_ids)
+
     def get_permissions(self):
         if self.action in {"create"}:
             return [permissions.IsAuthenticated(), IsTenantMember(), IsTenantAdminOrOwner()]
@@ -36,7 +49,15 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         queryset = super().get_queryset()
         if self._is_admin_or_owner(self.request):
             return queryset
-        return queryset.filter(assignee=self.request.user)
+        mentioned_task_ids = self._mentioned_task_ids_for_user(self.request.tenant, self.request.user)
+        return (
+            queryset.filter(
+                Q(assignee=self.request.user)
+                | Q(project__members__user=self.request.user, project__members__tenant=self.request.tenant)
+                | Q(id__in=mentioned_task_ids)
+            )
+            .distinct()
+        )
 
     def filter_queryset(self, queryset):
         queryset = super().filter_queryset(queryset)
@@ -127,6 +148,21 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         task = self.get_object()
         if request.method == "GET":
             rows = task.comments.select_related("author").order_by("created_at")
+            if not self._is_admin_or_owner(request):
+                is_project_member = ProjectMember.objects.filter(
+                    tenant=request.tenant,
+                    project=task.project,
+                    user=request.user,
+                ).exists()
+                is_assignee = task.assignee_id == request.user.id
+                is_creator = task.created_by_id == request.user.id
+                if not (is_project_member or is_assignee or is_creator):
+                    rows = [
+                        row
+                        for row in rows
+                        if row.author_id == request.user.id
+                        or str(request.user.id) in {str(item) for item in (row.mentions or [])}
+                    ]
             return Response(CommentSerializer(rows, many=True).data)
 
         serializer = CommentSerializer(data=request.data)
@@ -134,7 +170,6 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
         mentioned_users = resolve_mentioned_users(
             request.tenant,
             serializer.validated_data["body"],
-            explicit_user_ids=serializer.validated_data.get("mentions"),
         )
         mention_ids = [str(user.id) for user in mentioned_users]
         comment = Comment.objects.create(
@@ -174,7 +209,6 @@ class TaskViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
             mentioned_users = resolve_mentioned_users(
                 request.tenant,
                 body,
-                explicit_user_ids=request.data.get("mentions"),
             )
             mention_ids = [str(user.id) for user in mentioned_users]
             comment.body = body

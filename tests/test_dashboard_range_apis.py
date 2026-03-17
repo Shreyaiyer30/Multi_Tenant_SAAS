@@ -82,6 +82,34 @@ class DashboardRangeAPITests(APITestCase):
         self.assertEqual(response.data["range"], "7d")
         self.assertEqual(sum(item["completed"] for item in response.data["results"]), 2)
 
+    def test_dashboard_stats_supports_range_and_counts_are_tenant_scoped(self):
+        response = self.client.get(
+            reverse("dashboard-stats"),
+            {"range": "30d"},
+            HTTP_X_TENANT=self.tenant_a.slug,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["range"], "30d")
+        self.assertEqual(response.data["total_projects"], 1)
+        self.assertEqual(response.data["total_tasks"], 3)
+        self.assertEqual(response.data["completed_tasks"], 3)
+        self.assertEqual(response.data["completion_rate"], 100)
+        done_bucket = next((item for item in response.data["by_status"] if item["key"] == Task.Status.DONE), None)
+        self.assertIsNotNone(done_bucket)
+        self.assertEqual(done_bucket["value"], 3)
+
+    def test_tasks_comparison_supports_range(self):
+        response = self.client.get(
+            reverse("dashboard-tasks-comparison"),
+            {"range": "30d"},
+            HTTP_X_TENANT=self.tenant_a.slug,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["range"], "30d")
+        self.assertEqual(len(response.data["results"]), 30)
+        self.assertEqual(sum(item["created"] for item in response.data["results"]), 3)
+        self.assertEqual(sum(item["completed"] for item in response.data["results"]), 3)
+
     def test_team_performance_defaults_to_7d(self):
         response = self.client.get(reverse("dashboard-team-performance"), HTTP_X_TENANT=self.tenant_a.slug)
         self.assertEqual(response.status_code, status.HTTP_200_OK)

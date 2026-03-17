@@ -4,8 +4,10 @@ from rest_framework.views import APIView
 
 from apps.common.permissions import IsTenantMember
 from apps.dashboard.services import (
+    get_dashboard_stats,
     get_dashboard_overview,
     get_recent_activity,
+    get_tasks_comparison,
     get_tasks_trend,
     get_team_performance,
 )
@@ -39,6 +41,24 @@ class DashboardTasksTrendAPIView(APIView):
         workspace = request.tenant
         range_value = request.query_params.get("range", "7d")
         return Response(get_tasks_trend(workspace, range_value=range_value))
+
+
+class DashboardStatsAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsTenantMember]
+
+    def get(self, request):
+        workspace = request.tenant
+        range_value = request.query_params.get("range", "7d")
+        return Response(get_dashboard_stats(workspace, range_value=range_value))
+
+
+class DashboardTasksComparisonAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsTenantMember]
+
+    def get(self, request):
+        workspace = request.tenant
+        range_value = request.query_params.get("range", "7d")
+        return Response(get_tasks_comparison(workspace, range_value=range_value))
 
 
 class DashboardTeamPerformanceAPIView(APIView):

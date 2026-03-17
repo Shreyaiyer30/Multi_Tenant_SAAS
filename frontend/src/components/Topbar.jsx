@@ -1,282 +1,207 @@
-import { useEffect, useMemo, useState } from "react";
-import { Bell, ChevronDown, Menu, Moon, Search, Sun, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import api from "@/api/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { cn } from "@/lib";
 import { useAuth } from "@/context/AuthContext";
 import { useTenant } from "@/context/TenantContext";
 
-const pageTitles = {
-  "/dashboard": "Dashboard",
-  "/projects": "Projects",
-  "/tasks": "Tasks",
-  "/members": "Members",
-  "/notifications": "Notifications",
-  "/billing": "Billing",
-  "/reports": "Reports"
+// Reuse the custom hook logic or define here if needed for dropdowns
+const useOutsideClick = (callback) => {
+  const ref = useRef();
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) callback();
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [callback]);
+  return ref;
 };
 
-const searchTargets = [
-  { label: "Dashboard", href: "/dashboard", keywords: ["home", "overview", "stats"] },
-  { label: "Projects", href: "/projects", keywords: ["project", "board", "kanban"] },
-  { label: "Tasks", href: "/tasks", keywords: ["task", "todo", "work"] },
-  { label: "Members", href: "/members", keywords: ["users", "team", "workspace"] },
-  { label: "Notifications", href: "/notifications", keywords: ["alerts", "activity"] },
-  { label: "Billing", href: "/billing", keywords: ["plan", "subscription", "payment"] },
-  { label: "Reports", href: "/reports", keywords: ["analytics", "metrics", "reporting"] }
-];
+const topbarBreadcrumbs = {
+   "/dashboard": ["Workspace", "Insight", "Dashboard"],
+   "/projects": ["Workspace", "Task Management", "Projects"],
+   "/tasks": ["Workspace", "Task Management", "Tasks"],
+   "/members": ["Team", "Organization", "Members"],
+   "/reports": ["Insights", "Performance", "Reports"],
+};
 
-export default function Topbar({ onToggleMobileSidebar }) {
-  const { logout, user } = useAuth();
-  const { tenant, setTenant } = useTenant();
-  const navigate = useNavigate();
+export default function Topbar({ timeRange, setTimeRange, onToggleMobileSidebar }) {
+  const { user } = useAuth();
+  const { tenant } = useTenant();
   const location = useLocation();
-  const [query, setQuery] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [projectResults, setProjectResults] = useState([]);
-  const [taskResults, setTaskResults] = useState([]);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(true);
+  
+  const notificationsRef = useOutsideClick(() => setIsNotificationsOpen(false));
+  const paletteRef = useOutsideClick(() => setIsCommandPaletteOpen(false));
 
-  const currentWorkspace = useMemo(() => {
-    const workspaces = user?.workspaces || [];
-    return workspaces.find((ws) => ws.slug === tenant) || workspaces[0] || null;
-  }, [user, tenant]);
+  const path = location.pathname;
+  const crumbs = topbarBreadcrumbs[path] || ["Workspace", "Task Management", "Dashboard"];
 
-  const title = useMemo(() => {
-    if (location.pathname.startsWith("/projects/") && location.pathname.includes("/board")) return "Project Board";
-    return pageTitles[location.pathname] || "Workspace";
-  }, [location.pathname]);
-
-  const filteredTargets = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return searchTargets;
-
-    return searchTargets.filter((item) => {
-      const haystack = `${item.label} ${item.keywords.join(" ")}`.toLowerCase();
-      return haystack.includes(normalized);
-    });
-  }, [query]);
-
+  // Keyboard shortcut for Command Palette
   useEffect(() => {
-    const normalized = query.trim();
-    if (!normalized) {
-      setProjectResults([]);
-      setTaskResults([]);
-      setSearchLoading(false);
-      return;
-    }
-
-    let active = true;
-    setSearchLoading(true);
-    const timeoutId = setTimeout(async () => {
-      try {
-        const [projectRes, taskRes] = await Promise.all([
-          api.get("projects/", { params: { search: normalized, ordering: "-updated_at" } }),
-          api.get("tasks/", { params: { search: normalized, ordering: "-updated_at" } })
-        ]);
-
-        if (!active) return;
-        setProjectResults((projectRes.data?.results || projectRes.data || []).slice(0, 5));
-        setTaskResults((taskRes.data?.results || taskRes.data || []).slice(0, 5));
-      } catch {
-        if (!active) return;
-        setProjectResults([]);
-        setTaskResults([]);
-      } finally {
-        if (active) setSearchLoading(false);
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(true);
       }
-    }, 250);
-
-    return () => {
-      active = false;
-      clearTimeout(timeoutId);
+      if (e.key === 'Escape') setIsCommandPaletteOpen(false);
     };
-  }, [query]);
-
-  const navigateToSearchTarget = (href) => {
-    navigate(href);
-    setSearchOpen(false);
-  };
-
-  const submitSearch = (event) => {
-    event?.preventDefault?.();
-    if (projectResults.length) {
-      navigateToSearchTarget(`/projects/${projectResults[0].id}/board`);
-      return;
-    }
-    if (taskResults.length) {
-      navigateToSearchTarget("/tasks");
-      return;
-    }
-    if (filteredTargets.length) {
-      navigateToSearchTarget(filteredTargets[0].href);
-    }
-  };
-
-  const toggleTheme = () => {
-    document.documentElement.classList.toggle("light");
-    const isLight = document.documentElement.classList.contains("light");
-    document.documentElement.style.colorScheme = isLight ? "light" : "dark";
-  };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <button
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border/70 bg-card/80 text-muted-foreground lg:hidden"
-              onClick={onToggleMobileSidebar}
-              aria-label="Open menu"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
+      <header className="h-[58px] flex items-center justify-between px-6 border-b sticky top-0 shrink-0 z-40" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}>
+        {/* Left: Breadcrumb / Mobile Menu Toggle */}
+        <div className="flex items-center gap-4">
+           <button onClick={onToggleMobileSidebar} className="lg:hidden p-2 -ml-2 hover:bg-surface2 rounded-lg transition-colors">
+              <span className="text-xl">☰</span>
+           </button>
+           <div className="hidden sm:flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider">
+             <span className="text-muted cursor-pointer hover:text-white transition-colors">{crumbs[0]}</span>
+             <span className="text-muted opacity-40">/</span>
+             <span className="text-muted cursor-pointer hover:text-white transition-colors">{crumbs[1]}</span>
+             <span className="text-muted opacity-40">/</span>
+             <span className="text-text">{crumbs[2]}</span>
+           </div>
+        </div>
 
-            <div className="min-w-0 lg:hidden">
-              <p className="truncate text-base font-semibold tracking-tight">{title}</p>
-            </div>
+        {/* Center: Search / Command Palette Trigger */}
+        <div className="flex-1 max-w-md mx-8 hidden lg:block">
+           <div 
+             onClick={() => setIsCommandPaletteOpen(true)}
+             className="flex items-center justify-between h-9 px-4 rounded-full border cursor-pointer hover:border-accent transition-all group"
+             style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+           >
+             <div className="flex items-center gap-3">
+               <span className="text-muted group-hover:text-accent transition-colors">🔍</span>
+               <span className="text-muted text-xs">Search anything...</span>
+             </div>
+             <kbd className="px-1.5 py-0.5 rounded border border-border bg-surface2 text-[10px] text-muted font-mono leading-none">⌘K</kbd>
+           </div>
+        </div>
 
-            <div className="hidden min-w-0 items-center gap-3 lg:flex">
-              <div className="rounded-xl border border-border/70 bg-card/65 px-3 py-2 text-sm shadow-sm">
-                <div className="flex items-center gap-2">
-                  <span className="max-w-40 truncate font-medium tracking-tight">
-                    {currentWorkspace?.name || tenant || "Workspace"}
-                  </span>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </div>
-
-              <form className="relative min-w-[260px] max-w-[440px] flex-1" onSubmit={submitSearch}>
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search pages..."
-                  className="pl-9"
-                />
-              </form>
-            </div>
+        {/* Right: Actions */}
+        <div className="flex items-center gap-4">
+          <div className="flex rounded-lg border p-1" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
+            {['7d', '30d', '90d'].map((range) => (
+              <button
+                key={range}
+                onClick={() => setTimeRange(range)}
+                className={cn(
+                  "px-3 py-1 rounded-md text-[10px] font-bold transition-all",
+                  timeRange === range ? "bg-accent text-background" : "text-muted hover:text-white"
+                )}
+              >
+                {range.toUpperCase()}
+              </button>
+            ))}
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="h-10 w-10 rounded-xl p-0" onClick={() => setSearchOpen(true)}>
-              <Search className="h-4 w-4" />
-            </Button>
+          <div className="relative" ref={notificationsRef}>
+             <button 
+               onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+               className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface2 transition-all relative border"
+               style={{ borderColor: 'var(--border)' }}
+             >
+                <span className="text-lg">🔔</span>
+                {unreadNotifications && <div className="absolute top-2 right-2.5 w-2 h-2 rounded-full border-2 border-background bg-accent3" />}
+             </button>
 
-            <Button variant="secondary" size="sm" className="relative h-10 w-10 rounded-xl p-0" onClick={() => navigate("/notifications")}>
-              <Bell className="h-4 w-4" />
-              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-primary-hover" />
-            </Button>
+             {isNotificationsOpen && (
+                <div className="absolute right-0 mt-3 w-80 rounded-2xl border shadow-2xl overflow-hidden z-[100] animate-fade-up" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
+                   <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border)' }}>
+                      <h4 className="font-syne font-bold text-text">Notifications</h4>
+                      <button onClick={() => setUnreadNotifications(false)} className="text-[10px] font-bold text-accent hover:underline">Mark all read</button>
+                   </div>
+                   <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                      <div className="p-4 hover:bg-surface2 transition-colors cursor-pointer border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
+                         <div className="flex gap-3">
+                           <div className="w-2 h-2 rounded-full bg-accent mt-1.5 shrink-0" />
+                           <div>
+                              <p className="text-xs text-text leading-tight">Arjun mentioned you in task <span className="text-accent2">#24 - Navbar Fix</span></p>
+                              <span className="text-[10px] text-muted mt-1 block">5m ago</span>
+                           </div>
+                         </div>
+                      </div>
+                      <div className="p-4 hover:bg-surface2 transition-colors cursor-pointer border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
+                         <div className="flex gap-3 pl-5">
+                           <div>
+                              <p className="text-xs text-text leading-tight">Project <span className="text-accent4">FlowDesk v2</span> reached 80% completion</p>
+                              <span className="text-[10px] text-muted mt-1 block">2h ago</span>
+                           </div>
+                         </div>
+                      </div>
+                   </div>
+                </div>
+             )}
+          </div>
 
-            <Button variant="ghost" size="sm" className="h-10 w-10 rounded-xl p-0" onClick={toggleTheme}>
-              {document.documentElement.classList.contains("light") ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-            </Button>
-
-            <details className="group relative hidden sm:block">
-              <summary className="list-none">
-                <button className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary-hover to-primary text-sm font-semibold text-primary-foreground shadow-md">
-                  {(user?.display_name || user?.email || "U").charAt(0).toUpperCase()}
-                </button>
-              </summary>
-              <div className="absolute right-0 mt-2 min-w-52 rounded-2xl border border-border/70 bg-card/95 p-2 shadow-xl backdrop-blur">
-                <p className="px-3 py-2 text-sm font-medium">{user?.display_name || "Account"}</p>
-                <p className="px-3 pb-2 text-xs text-muted-foreground">{user?.email || ""}</p>
-                <button className="w-full rounded-lg px-3 py-2 text-left text-sm text-danger-foreground transition hover:bg-danger/15" onClick={logout}>
-                  Logout
-                </button>
-              </div>
-            </details>
+          <div 
+            className="w-9 h-9 rounded-full border p-0.5" 
+            style={{ borderColor: 'var(--border)', background: 'linear-gradient(135deg, var(--accent2), var(--accent5))' }}
+          >
+            <div className="w-full h-full rounded-full bg-background flex items-center justify-center font-bold text-[10px] text-text">
+               {(user?.display_name?.[0] || user?.email?.[0] || 'U').toUpperCase()}
+            </div>
           </div>
         </div>
       </header>
 
-      <div className={`fixed inset-0 z-40 bg-background/75 backdrop-blur-sm transition-opacity ${searchOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} onClick={() => setSearchOpen(false)} />
-      <div className={`fixed inset-x-0 top-0 z-50 p-4 transition-transform sm:p-6 ${searchOpen ? "translate-y-0" : "-translate-y-full"}`}>
-        <div className="mx-auto w-full max-w-xl rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm font-medium">Search</p>
-            <button className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border/70" onClick={() => setSearchOpen(false)}>
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          <form onSubmit={submitSearch}>
-            <Input
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search pages..."
-            />
-          </form>
-
-          <div className="mt-3 max-h-64 space-y-2 overflow-y-auto rounded-xl border border-border/70 bg-background/60 p-2">
-            {searchLoading ? <p className="px-2 py-2 text-xs text-muted-foreground">Searching...</p> : null}
-
-            {projectResults.length ? (
-              <div className="space-y-1">
-                <p className="px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Projects</p>
-                {projectResults.map((project) => (
-                  <button
-                    key={project.id}
-                    className="flex w-full items-center rounded-lg px-2 py-2 text-left text-sm text-foreground/90 transition hover:bg-muted/55"
-                    onClick={() => navigateToSearchTarget(`/projects/${project.id}/board`)}
-                  >
-                    {project.name}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            {taskResults.length ? (
-              <div className="space-y-1">
-                <p className="px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tasks</p>
-                {taskResults.map((task) => (
-                  <button
-                    key={task.id}
-                    className="flex w-full items-center rounded-lg px-2 py-2 text-left text-sm text-foreground/90 transition hover:bg-muted/55"
-                    onClick={() => navigateToSearchTarget("/tasks")}
-                  >
-                    {task.title}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            {!query.trim() ? (
-              <div className="space-y-1">
-                <p className="px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Pages</p>
-                {filteredTargets.map((item) => (
-                  <button
-                    key={item.href}
-                    className="flex h-10 w-full items-center rounded-lg px-2 text-left text-sm text-foreground/90 transition hover:bg-muted/55"
-                    onClick={() => navigateToSearchTarget(item.href)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            {!searchLoading && query.trim() && !projectResults.length && !taskResults.length ? (
-              <p className="px-2 py-2 text-xs text-muted-foreground">No matching projects or tasks.</p>
-            ) : null}
-          </div>
-
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <select
-              className="h-10 rounded-xl border border-border/80 bg-background/80 px-3 text-sm"
-              value={tenant || ""}
-              onChange={(e) => setTenant(e.target.value)}
-            >
-              {(user?.workspaces || []).map((ws) => (
-                <option key={ws.slug} value={ws.slug}>{ws.name}</option>
-              ))}
-            </select>
-            <Button variant="secondary" className="h-10" onClick={logout}>Logout</Button>
+      {/* Command Palette Modal */}
+      {isCommandPaletteOpen && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md bg-background/80"
+          style={{ animation: 'fadeIn 0.2s ease-out' }}
+        >
+          <div 
+            ref={paletteRef}
+            className="w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden animate-fade-up"
+            style={{ backgroundColor: 'var(--surface2)', borderColor: 'var(--border)' }}
+          >
+            <div className="relative border-b" style={{ borderColor: 'var(--border)' }}>
+               <span className="absolute left-6 top-1/2 -translate-y-1/2 text-xl opacity-50">🔍</span>
+               <input 
+                 autoFocus
+                 placeholder="Search dashboard, projects, team..."
+                 className="w-full h-16 bg-transparent px-16 text-lg focus:outline-none placeholder:text-muted font-medium text-text font-syne"
+               />
+            </div>
+            <div className="p-4 max-h-[400px] overflow-y-auto">
+               <div className="px-4 py-2 text-[10px] font-bold text-muted uppercase tracking-widest">Recent</div>
+               <div className="space-y-1">
+                 {[
+                   { label: 'Project: Nebula SaaS', icon: '📁', sub: 'Last edited 2h ago' },
+                   { label: 'Team Members', icon: '👥', sub: '3 active now' },
+                   { label: 'Dashboard Overview', icon: '◰', sub: 'Insights' },
+                 ].map((item) => (
+                   <div key={item.label} className="flex items-center justify-between p-3 rounded-xl hover:bg-surface transition-all cursor-pointer group">
+                      <div className="flex items-center gap-4">
+                        <span className="text-xl w-6 text-center">{item.icon}</span>
+                        <div>
+                          <p className="font-syne font-semibold text-text">{item.label}</p>
+                          <p className="text-[10px] text-muted">{item.sub}</p>
+                        </div>
+                      </div>
+                      <span className="text-xs text-muted opacity-0 group-hover:opacity-100 italic transition-opacity">↵ Navigate</span>
+                   </div>
+                 ))}
+               </div>
+            </div>
+            <div className="p-4 border-t flex items-center justify-between" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}>
+               <div className="flex gap-4">
+                  <span className="text-[10px] text-muted"><kbd className="px-1 py-0.5 rounded bg-surface2 border border-border">↑↓</kbd> Select</span>
+                  <span className="text-[10px] text-muted"><kbd className="px-1 py-0.5 rounded bg-surface2 border border-border">↵</kbd> Open</span>
+               </div>
+               <span className="text-[10px] text-muted">Press ESC to dismiss</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </>
   );
 }
+

@@ -126,6 +126,47 @@ def get_recent_activity(workspace, limit=10):
     return activity[:limit]
 
 
+def get_dashboard_stats(workspace, range_value="7d"):
+    range_key, days = resolve_range_days(range_value)
+    _, _, start_dt, end_dt = _range_window(days)
+
+    tasks_in_range = Task.objects.filter(
+        tenant=workspace,
+        created_at__gte=start_dt,
+        created_at__lte=end_dt,
+    )
+    total_projects = Project.objects.filter(tenant=workspace).count()
+    total_tasks = tasks_in_range.count()
+    completed_tasks = tasks_in_range.filter(status=Task.Status.DONE).count()
+    overdue_tasks = (
+        tasks_in_range.filter(due_date__lt=timezone.localdate())
+        .exclude(status=Task.Status.DONE)
+        .count()
+    )
+    completion_rate = int((completed_tasks / total_tasks) * 100) if total_tasks else 0
+
+    status_keys = [value for value, _ in Task.Status.choices]
+    status_counts = _aggregate_counts(tasks_in_range, "status", status_keys)
+    by_status = [
+        {
+            "key": key,
+            "label": key.replace("_", " "),
+            "value": int(status_counts.get(key, 0)),
+        }
+        for key in status_keys
+    ]
+
+    return {
+        "range": range_key,
+        "total_projects": total_projects,
+        "total_tasks": total_tasks,
+        "completed_tasks": completed_tasks,
+        "completion_rate": completion_rate,
+        "overdue_tasks": overdue_tasks,
+        "by_status": by_status,
+    }
+
+
 def get_tasks_trend(workspace, range_value="7d"):
     range_key, days = resolve_range_days(range_value)
     start_date, end_date, start_dt, end_dt = _range_window(days)
@@ -155,6 +196,51 @@ def get_tasks_trend(workspace, range_value="7d"):
             }
         )
         cursor += timedelta(days=1)
+    return {"range": range_key, "results": payload}
+
+
+def get_tasks_comparison(workspace, range_value="7d"):
+    range_key, days = resolve_range_days(range_value)
+    start_date, end_date, start_dt, end_dt = _range_window(days)
+
+    created_rows = (
+        Task.objects.filter(
+            tenant=workspace,
+            created_at__gte=start_dt,
+            created_at__lte=end_dt,
+        )
+        .annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(created=Count("id"))
+    )
+    completed_rows = (
+        Task.objects.filter(
+            tenant=workspace,
+            status=Task.Status.DONE,
+            updated_at__gte=start_dt,
+            updated_at__lte=end_dt,
+        )
+        .annotate(day=TruncDate("updated_at"))
+        .values("day")
+        .annotate(completed=Count("id"))
+    )
+    created_counts = {row["day"]: int(row["created"]) for row in created_rows}
+    completed_counts = {row["day"]: int(row["completed"]) for row in completed_rows}
+
+    payload = []
+    cursor = start_date
+    while cursor <= end_date:
+        payload.append(
+            {
+                "date": cursor.isoformat(),
+                "label": cursor.strftime("%a") if days <= 7 else cursor.strftime("%b %d"),
+                "full_date": cursor.strftime("%b %d, %Y"),
+                "created": created_counts.get(cursor, 0),
+                "completed": completed_counts.get(cursor, 0),
+            }
+        )
+        cursor += timedelta(days=1)
+
     return {"range": range_key, "results": payload}
 
 

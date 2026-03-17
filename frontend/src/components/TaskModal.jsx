@@ -23,6 +23,12 @@ function normalizeMentionHandle(value) {
     .replace(/^_+|_+$/g, "");
 }
 
+function usernameFromUser(user) {
+  const email = String(user?.email || "");
+  const local = email.split("@")[0] || "";
+  return normalizeMentionHandle(local) || normalizeMentionHandle(user?.display_name) || "member";
+}
+
 function extractMentionContext(value, cursor) {
   const atIndex = value.lastIndexOf("@", cursor - 1);
   if (atIndex < 0) return null;
@@ -55,6 +61,7 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated, onDelet
   const [workspaceMembers, setWorkspaceMembers] = useState([]);
   const [comment, setComment] = useState("");
   const [mentionContext, setMentionContext] = useState(null);
+  const [trackedMentionIds, setTrackedMentionIds] = useState([]);
   const commentInputRef = useRef(null);
 
   useEffect(() => {
@@ -85,14 +92,13 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated, onDelet
         const user = membership?.user || {};
         const displayName = user.display_name || user.email || "Member";
         const email = user.email || "";
-        const handle =
-          normalizeMentionHandle(displayName) || normalizeMentionHandle(email.split("@")[0]) || "member";
+        const username = usernameFromUser(user);
         return {
           id: String(user.id),
           displayName,
           email,
-          handle,
-          search: `${displayName} ${email} ${handle}`.toLowerCase()
+          username,
+          search: `${displayName} ${email} ${username}`.toLowerCase()
         };
       })
       .filter((member) => member.id);
@@ -109,7 +115,7 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated, onDelet
   const extractMentionIds = (text) => {
     MENTION_PATTERN.lastIndex = 0;
     const handleToMember = mentionableMembers.reduce((acc, member) => {
-      if (!acc[member.handle]) acc[member.handle] = member;
+      if (!acc[member.username]) acc[member.username] = member;
       return acc;
     }, {});
     const seen = new Set();
@@ -127,10 +133,11 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated, onDelet
 
   const insertMention = (member) => {
     if (!mentionContext) return;
-    const mentionToken = `@${member.handle} `;
+    const mentionToken = `@${member.username} `;
     const updated = `${comment.slice(0, mentionContext.start)}${mentionToken}${comment.slice(mentionContext.end)}`;
     const cursorPosition = mentionContext.start + mentionToken.length;
     setComment(updated);
+    setTrackedMentionIds(extractMentionIds(updated));
     setMentionContext(null);
     requestAnimationFrame(() => {
       if (!commentInputRef.current) return;
@@ -157,10 +164,10 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated, onDelet
   const postComment = async () => {
     if (!comment.trim()) return;
     try {
-      const mentions = extractMentionIds(comment);
-      const { data } = await api.post(`tasks/${task.id}/comments/`, { body: comment, mentions });
+      const { data } = await api.post(`tasks/${task.id}/comments/`, { body: comment });
       setComments((prev) => [...prev, data]);
       setComment("");
+      setTrackedMentionIds([]);
       setMentionContext(null);
     } catch {
       toast.error("Failed to post comment");
@@ -285,7 +292,7 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated, onDelet
                         }}
                       >
                         <span className="font-medium">{member.displayName}</span>
-                        <span className="text-xs text-muted-foreground">@{member.handle}</span>
+                        <span className="text-xs text-muted-foreground">@{member.username}</span>
                       </button>
                     ))
                   ) : (
@@ -299,6 +306,7 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated, onDelet
                 onChange={(event) => {
                   const next = event.target.value;
                   setComment(next);
+                  setTrackedMentionIds(extractMentionIds(next));
                   setMentionContext(extractMentionContext(next, event.target.selectionStart ?? next.length));
                 }}
                 onKeyDown={(event) => {
@@ -320,6 +328,11 @@ export default function TaskModal({ task, open, onOpenChange, onUpdated, onDelet
                 className="w-full rounded-xl border border-border/80 bg-background/80 px-3 py-2 text-sm outline-none transition-all duration-150 placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/60"
               />
             </div>
+            {trackedMentionIds.length ? (
+              <p className="text-xs text-muted-foreground">
+                Mentioning {trackedMentionIds.length} member{trackedMentionIds.length > 1 ? "s" : ""}.
+              </p>
+            ) : null}
             <Button onClick={postComment}>Post Comment</Button>
           </TabsContent>
 
