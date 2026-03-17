@@ -47,7 +47,7 @@ function ProtectedLayout() {
   return (
     <div
       className="min-h-screen bg-background lg:grid lg:transition-[grid-template-columns] lg:duration-300"
-      style={{ gridTemplateColumns: sidebarCollapsed ? "72px 1fr" : "260px 1fr" }}
+      style={{ gridTemplateColumns: sidebarCollapsed ? "60px 1fr" : "240px 1fr" }}
     >
       <Sidebar
         collapsed={sidebarCollapsed}

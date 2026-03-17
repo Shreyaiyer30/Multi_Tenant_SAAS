@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib";
 import { useAuth } from "@/context/AuthContext";
 import { useTenant } from "@/context/TenantContext";
+import api from "@/api/api";
 import { 
   Search, 
   Bell, 
@@ -44,7 +45,7 @@ export default function Topbar({ timeRange, setTimeRange, onToggleMobileSidebar,
   const navigate = useNavigate();
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(1);
+  const [unreadCount, setUnreadCount] = useState(0);
   
   const notificationsRef = useOutsideClick(() => setIsNotificationsOpen(false));
   const paletteRef = useOutsideClick(() => setIsCommandPaletteOpen(false));
@@ -53,6 +54,11 @@ export default function Topbar({ timeRange, setTimeRange, onToggleMobileSidebar,
   const crumbs = topbarBreadcrumbs[path] || ["Workspace", "Task Management", "Dashboard"];
 
   useEffect(() => {
+    const handleNotifyUpdate = (e) => {
+      setUnreadCount(e.detail?.unread_count ?? 0);
+    };
+    window.addEventListener("notifications-updated", handleNotifyUpdate);
+    
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
@@ -61,8 +67,18 @@ export default function Topbar({ timeRange, setTimeRange, onToggleMobileSidebar,
       if (e.key === 'Escape') setIsCommandPaletteOpen(false);
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener("notifications-updated", handleNotifyUpdate);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!tenant) return;
+    api.get("notifications/").then(({ data }) => {
+      setUnreadCount(Number(data?.unread_count ?? 0));
+    }).catch(() => {});
+  }, [tenant]);
 
   return (
     <>
@@ -142,7 +158,9 @@ export default function Topbar({ timeRange, setTimeRange, onToggleMobileSidebar,
              >
                 <Bell size={16} />
                 {unreadCount > 0 && (
-                  <div className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-accent4 border-2 border-background animate-pulse" />
+                  <div className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full bg-accent text-background text-[8px] font-black flex items-center justify-center shadow-lg animate-fade-up">
+                    {unreadCount}
+                  </div>
                 )}
              </button>
 

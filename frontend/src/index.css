@@ -5,48 +5,48 @@
 @tailwind utilities;
 
 :root {
-  --background: #070b0f;
-  --surface: #0d1520;
-  --surface2: #121d2e;
-  --border: #1a2d44;
-  --accent: #00e5c0;
-  --accent2: #4f8fff;
-  --accent3: #ff5f6b;
-  --accent4: #f9c74f;
-  --accent5: #a78bfa;
-  --text: #ddeeff;
-  --muted: #4d6a85;
+  --background: #020408;
+  --surface: #0a0f1a;
+  --surface2: #121a2b;
+  --border: #1e293b;
+  --accent: #00f5d4;
+  --accent2: #3b82f6;
+  --accent3: #f43f5e;
+  --accent4: #fbbf24;
+  --accent5: #a855f7;
+  --text: #f8fafc;
+  --muted: #64748b;
   
-  /* Shorthands for existing components using HSL if needed, but I'll mostly use the hex vars */
-  --foreground: #ddeeff;
-  --card: #0d1520;
-  --card-foreground: #ddeeff;
-  --primary: #00e5c0;
-  --secondary: #4f8fff;
+  /* Shorthands for layout components */
+  --foreground: #f8fafc;
+  --card: #0a0f1a;
+  --card-foreground: #f8fafc;
+  --primary: #00f5d4;
+  --secondary: #3b82f6;
 }
 
 .light {
-  --background: 210 44% 96%;
-  --foreground: 220 38% 12%;
-  --card: 0 0% 100%;
-  --card-elevated: 210 32% 98%;
-  --card-foreground: 220 38% 12%;
-  --primary: 191 98% 32%;
-  --primary-hover: 191 84% 38%;
-  --primary-active: 192 92% 26%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 217 84% 54%;
-  --secondary-foreground: 0 0% 100%;
-  --muted: 213 38% 90%;
-  --muted-foreground: 220 18% 36%;
-  --border: 212 32% 82%;
-  --input: 212 32% 82%;
-  --ring: 191 84% 38%;
-  --success: 191 80% 36%;
-  --success-foreground: 0 0% 100%;
-  --danger: 347 77% 50%;
-  --danger-foreground: 0 0% 100%;
-  --disabled: 217 14% 44%;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-elevated: #ffffff;
+  --card-foreground: #0f172a;
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --primary-active: #1d4ed8;
+  --primary-foreground: #ffffff;
+  --secondary: #10b981;
+  --secondary-foreground: #ffffff;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #3b82f6;
+  --success: #10b981;
+  --success-foreground: #ffffff;
+  --danger: #ef4444;
+  --danger-foreground: #ffffff;
+  --disabled: #94a3b8;
 }
 
 *,
@@ -62,8 +62,8 @@ html {
 body {
   @apply bg-background text-foreground antialiased;
   background-image:
-    radial-gradient(1200px 620px at -15% -25%, rgba(0, 229, 192, 0.08), transparent 58%),
-    radial-gradient(980px 520px at 112% -15%, rgba(79, 143, 255, 0.07), transparent 52%);
+    radial-gradient(1200px 620px at -15% -25%, rgba(0, 245, 212, 0.08), transparent 58%),
+    radial-gradient(980px 520px at 112% -15%, rgba(59, 130, 246, 0.07), transparent 52%);
   font-family: 'DM Mono', monospace;
   color: var(--text);
 }
@@ -78,8 +78,16 @@ h4 {
 @layer utilities {
   .surface-glass {
     background-color: var(--surface);
-    @apply border border-border/65 backdrop-blur-xl;
-    box-shadow: 0 16px 42px rgba(4, 9, 20, 0.45);
+    @apply border border-border/40 backdrop-blur-2xl;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  }
+
+  .accent-glow {
+    box-shadow: 0 0 20px rgba(0, 245, 212, 0.3);
+  }
+
+  .accent-glow-strong {
+    box-shadow: 0 0 35px rgba(0, 245, 212, 0.5);
   }
 
   .elevate-hover {

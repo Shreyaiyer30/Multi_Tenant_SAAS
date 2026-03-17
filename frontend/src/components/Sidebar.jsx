@@ -242,7 +242,7 @@ export default function Sidebar({
           "fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col border-r shadow-2xl transition-transform duration-300 transform lg:hidden",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
-        style={{ borderColor: 'var(--border)', backgroundColor: '#070b0f' }}
+        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}
       >
         <div className="flex items-center justify-between px-4 h-14 border-b border-border/50 shrink-0">
           <div className="flex items-center gap-3">

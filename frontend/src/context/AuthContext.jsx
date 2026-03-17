@@ -171,7 +171,7 @@ export function AuthProvider({ children }) {
     const token = persistTokens(data);
     applyAuthWorkspacePayload(data);
     await fetchMe(token);
-    toast.success("Welcome to TaskSaaS! Your workspace is ready.");
+    toast.success("Welcome to FlowDesk! Your workspace is ready.");
     return data;
   };
 

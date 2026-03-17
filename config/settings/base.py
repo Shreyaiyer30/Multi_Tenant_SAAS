@@ -220,8 +220,8 @@ SIMPLE_JWT = {
 }
 
 SPECTACULAR_SETTINGS = {
-    "TITLE": "TaskSaaS API",
-    "DESCRIPTION": "Multi-tenant task management API",
+    "TITLE": "FlowDesk API",
+    "DESCRIPTION": "Multi-tenant task management API for FlowDesk",
     "VERSION": "1.0.0",
 }
 
